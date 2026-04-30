@@ -4,11 +4,26 @@ const path = require('path');
 const { downloadText } = require('./textDownloader');
 const { downloadAudio } = require('./audioDownloader');
 
-const baseUrlAudio = 'https://www.bible.com/audio-bible/1854/MAT.1.NTE12';
-const downloadFolder = '../data';
+/**
+ * CONFIGURATION
+ * Edit these values to target specific books or chapters.
+ */
+const config = {
+    bookCode: 'MAT',     // USFM code: MAT (Matthew), MRK (Mark), LUK (Luke), JHN (John), etc.
+    startChapter: 1,     // Chapter to start from
+    versionCode: 'NTE12',// Bible version code
+    versionId: '1854',   // Bible version numeric ID
+    downloadFolder: '../data',
+    maxIterations: 100,  // Safety limit if downloadUntilEnd is false
+    stopAtBookEnd: true, // Stop when the book changes (e.g. MAT -> MRK)
+    downloadUntilEnd: false // If true, ignore stopAtBookEnd and maxIterations, keep going until no "Next" button
+};
 
-if (!fs.existsSync(downloadFolder)) {
-    fs.mkdirSync(downloadFolder, { recursive: true });
+// Construct the initial URL based on configuration
+const baseUrlAudio = `https://www.bible.com/audio-bible/${config.versionId}/${config.bookCode}.${config.startChapter}.${config.versionCode}`;
+
+if (!fs.existsSync(config.downloadFolder)) {
+    fs.mkdirSync(config.downloadFolder, { recursive: true });
 }
 
 async function getBookTitleAndChapter(page) {
@@ -52,7 +67,7 @@ async function navigateToNextPage(page) {
     }
 }
 
-async function processChapter(page, counter) {
+async function processChapter(page, counter, initialBookName) {
     // We start on the AUDIO page
     const audioUrl = page.url();
     // Derive the TEXT page URL
@@ -62,14 +77,24 @@ async function processChapter(page, counter) {
     await page.goto(textUrl);
 
     const info = await getBookTitleAndChapter(page);
-    console.log(`Current position: ${info ? `${info.book} ${info.chapter}` : 'Unknown'}`);
+    if (!info) {
+        throw new Error('Could not find book/chapter info on page.');
+    }
 
-    let bookName = info ? info.book.replace(/[\s.]+/g, '_').toLowerCase() : 'unknown';
-    let chapterNum = info ? info.chapter : counter;
-    let fileNameBase = `${bookName}_${chapterNum}`;
+    console.log(`Current position: ${info.book} ${info.chapter}`);
+
+    // Check if we should stop because the book changed
+    // ONLY check this if downloadUntilEnd is false
+    if (!config.downloadUntilEnd && config.stopAtBookEnd && initialBookName && info.book !== initialBookName) {
+        console.log(`Book changed from ${initialBookName} to ${info.book}. Stopping.`);
+        return { shouldStop: true };
+    }
+
+    let bookNameSafe = info.book.replace(/[\s.]+/g, '_').toLowerCase();
+    let fileNameBase = `${bookNameSafe}_${info.chapter}`;
 
     // Create nested folder structure: data/book/book_chapter/
-    const bookPath = path.join(downloadFolder, bookName);
+    const bookPath = path.join(config.downloadFolder, bookNameSafe);
     const chapterPath = path.join(bookPath, fileNameBase);
 
     if (!fs.existsSync(chapterPath)) {
@@ -84,23 +109,39 @@ async function processChapter(page, counter) {
     await page.goto(audioUrl);
     await downloadAudio(page, fileNameBase, chapterPath);
 
-    // 3. Move to next chapter (this stays in the /audio-bible/ context)
+    // 3. Move to next chapter
     await navigateToNextPage(page);
     await page.waitForTimeout(3000);
+
+    return { shouldStop: false, currentBookName: info.book };
 }
 
 (async () => {
     const browser = await chromium.launch({ headless: false });
     const page = await browser.newPage();
+    
+    console.log(`Starting download from: ${baseUrlAudio}`);
     await page.goto(baseUrlAudio);
 
     let counter = 1;
-    while (counter <= 100) {
-        console.log(`Processing chapter ${counter}...`);
+    let initialBookName = null;
+    const loopLimit = config.downloadUntilEnd ? Infinity : config.maxIterations;
+
+    while (counter <= loopLimit) {
+        console.log(`\n--- Iteration ${counter} ---`);
         try {
-            await processChapter(page, counter);
+            const result = await processChapter(page, counter, initialBookName);
+            
+            if (result.shouldStop) {
+                break;
+            }
+
+            // Set the initial book name on the first successful iteration
+            if (!initialBookName) {
+                initialBookName = result.currentBookName;
+            }
         } catch (err) {
-            console.error(`Stopped at counter ${counter} due to error.`);
+            console.log(`Stopping: No more chapters found or error occurred: ${err.message}`);
             break;
         }
         counter++;
@@ -108,4 +149,5 @@ async function processChapter(page, counter) {
 
     await page.close();
     await browser.close();
+    console.log('\nProcessing complete.');
 })();
