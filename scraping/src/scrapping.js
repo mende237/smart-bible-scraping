@@ -4,11 +4,55 @@ const path = require('path');
 const { downloadText } = require('./textDownloader');
 const { downloadAudio } = require('./audioDownloader');
 
-const baseUrlAudio = 'https://www.bible.com/audio-bible/1854/MAT.1.NTE12';
-const downloadFolder = '../data';
+language = "french"
 
-if (!fs.existsSync(downloadFolder)) {
-    fs.mkdirSync(downloadFolder, { recursive: true });
+
+let versionCode = 'S21'; // Bible version code: NTE12 for ewondo; S21 for french
+let versionId = '152';   // Bible version numeric ID: 1854 for ewondo; 152 for french
+let downloadFolder = '../data/default';
+let shouldDownloadText = true;
+let shouldDownloadAudio = false;
+
+
+if (language === "french") {
+    versionCode = 'S21';
+    versionId = '152';
+    downloadFolder = '../data/french';
+    shouldDownloadText = true;
+    shouldDownloadAudio = false;
+} else if (language === "ewondo") {
+    versionCode = 'NTE12';
+    versionId = '1854';
+    downloadFolder = '../data/default';
+    shouldDownloadText = true;
+    shouldDownloadAudio = true;
+}
+
+/**
+ * CONFIGURATION
+ * Edit these values to target specific books or chapters.
+ */
+const config = {
+    bookCode: 'MAT',     // USFM code: MAT (Matthew), MRK (Mark), LUK (Luke), JHN (John), etc.
+    startChapter: 1,     // Chapter to start from
+    versionCode,
+    versionId,
+    downloadFolder,
+    maxIterations: 100,  // Safety limit if downloadUntilEnd is false
+    stopAtBookEnd: true, // Stop when the book changes (e.g. MAT -> MRK)
+    downloadUntilEnd: true, // If true, ignore stopAtBookEnd and maxIterations, keep going until no "Next" button
+    shouldDownloadText,
+    shouldDownloadAudio
+};
+
+// Construct the initial URLs based on configuration
+const baseUrlAudio = `https://www.bible.com/audio-bible/${config.versionId}/${config.bookCode}.${config.startChapter}.${config.versionCode}`;
+const baseUrlText = `https://www.bible.com/bible/${config.versionId}/${config.bookCode}.${config.startChapter}.${config.versionCode}`;
+
+const initialUrl = config.shouldDownloadAudio ? baseUrlAudio : baseUrlText;
+
+if (!fs.existsSync(config.downloadFolder)) {
+    fs.mkdirSync(config.downloadFolder, { recursive: true });
 }
 
 async function getBookTitleAndChapter(page) {
@@ -36,71 +80,145 @@ async function getBookTitleAndChapter(page) {
 
 async function navigateToNextPage(page) {
     console.log('Attempting to click Next Chapter button...');
-    const nextButton = page.getByLabel('Next Chapter');
-    try {
-        await nextButton.click({ timeout: 30000 });
-        console.log('Clicked Next Chapter button.');
-    } catch (error) {
-        console.error('Failed to click Next Chapter button with getByLabel:', error.message);
+
+    // Scroll to the bottom of the page first, as the button might be lazy-loaded or at the end of the content
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(1000);
+
+    // List of strategies to find and click the "Next Chapter" button
+    const strategies = [
+        {
+            name: 'getByRole link with name "Next Chapter"',
+            action: async () => await page.getByRole('link', { name: 'Next Chapter' }).first().click({ timeout: 5000 })
+        },
+        {
+            name: 'getByLabel "Next Chapter"',
+            action: async () => await page.getByLabel('Next Chapter').first().click({ timeout: 5000 })
+        },
+        {
+            name: 'CSS selector a:has(svg title:has-text("Next Chapter"))',
+            action: async () => await page.locator('a:has(svg title:has-text("Next Chapter"))').first().click({ timeout: 5000 })
+        },
+        {
+            name: 'CSS selector svg title:has-text("Next Chapter")',
+            action: async () => await page.locator('svg title:has-text("Next Chapter")').first().click({ timeout: 5000 })
+        },
+        {
+            name: 'Aria-labelledby fallback',
+            action: async () => await page.locator('[aria-labelledby*="Next"][aria-labelledby*="Chapter"]').first().click({ timeout: 5000 })
+        },
+        {
+            name: 'XPath fallback for Next Chapter text',
+            action: async () => await page.locator('//a[.//text()="Next Chapter"] | //button[.//text()="Next Chapter"]').first().click({ timeout: 5000 })
+        }
+    ];
+
+    for (const strategy of strategies) {
         try {
-            await page.click('[aria-label="Next Chapter"]', { timeout: 10000 });
-            console.log('Clicked Next Chapter button (fallback).');
-        } catch (fallbackError) {
-            console.error('Fallback also failed.');
-            throw fallbackError;
+            await strategy.action();
+            console.log(`Clicked Next Chapter button using strategy: ${strategy.name}`);
+            return;
+        } catch (error) {
+            // Strategy failed, move to next one
+            // console.error(`${strategy.name} failed: ${error.message}`);
         }
     }
+
+    // If all else fails, try to find a link that looks like a "next" link (contains next chapter number)
+    // This is more complex and depends on knowing the current book/chapter.
+    // For now, we throw an error if all strategies fail.
+    throw new Error('All attempts to click Next Chapter button failed.');
 }
 
-async function processChapter(page, counter) {
-    // We start on the AUDIO page
-    const audioUrl = page.url();
-    // Derive the TEXT page URL
-    const textUrl = audioUrl.replace('/audio-bible/', '/bible/');
+async function processChapter(page, counter, initialBookName) {
+    const currentUrl = page.url();
+    let audioUrl, textUrl;
 
-    console.log(`Switching to text version for scraping: ${textUrl}`);
-    await page.goto(textUrl);
+    if (currentUrl.includes('/audio-bible/')) {
+        audioUrl = currentUrl;
+        textUrl = currentUrl.replace('/audio-bible/', '/bible/');
+    } else {
+        textUrl = currentUrl;
+        audioUrl = currentUrl.replace('/bible/', '/audio-bible/');
+    }
 
+    // 1. Get Metadata (Book and Chapter)
+    // We can get this from either page, but let's ensure we are on one of them
     const info = await getBookTitleAndChapter(page);
-    console.log(`Current position: ${info ? `${info.book} ${info.chapter}` : 'Unknown'}`);
+    if (!info) {
+        throw new Error('Could not find book/chapter info on page.');
+    }
 
-    let bookName = info ? info.book.replace(/[\s.]+/g, '_').toLowerCase() : 'unknown';
-    let chapterNum = info ? info.chapter : counter;
-    let fileNameBase = `${bookName}_${chapterNum}`;
+    console.log(`Current position: ${info.book} ${info.chapter}`);
+
+    // Check if we should stop because the book changed
+    if (!config.downloadUntilEnd && config.stopAtBookEnd && initialBookName && info.book !== initialBookName) {
+        console.log(`Book changed from ${initialBookName} to ${info.book}. Stopping.`);
+        return { shouldStop: true };
+    }
+
+    let bookNameSafe = info.book.replace(/[\s.]+/g, '_').toLowerCase();
+    let fileNameBase = `${bookNameSafe}_${info.chapter}`;
 
     // Create nested folder structure: data/book/book_chapter/
-    const bookPath = path.join(downloadFolder, bookName);
+    const bookPath = path.join(config.downloadFolder, bookNameSafe);
     const chapterPath = path.join(bookPath, fileNameBase);
 
     if (!fs.existsSync(chapterPath)) {
         fs.mkdirSync(chapterPath, { recursive: true });
     }
 
-    // 1. Download Text from the /bible/ URL
-    await downloadText(page, fileNameBase, chapterPath);
+    // 2. Download Text if requested
+    if (config.shouldDownloadText) {
+        if (!page.url().includes('/bible/')) {
+            console.log(`Switching to text version: ${textUrl}`);
+            await page.goto(textUrl);
+        }
+        await downloadText(page, fileNameBase, chapterPath);
+    }
 
-    // 2. Switch back to Audio Page to get the MP3
-    console.log(`Switching back to audio version: ${audioUrl}`);
-    await page.goto(audioUrl);
-    await downloadAudio(page, fileNameBase, chapterPath);
+    // 3. Download Audio if requested
+    if (config.shouldDownloadAudio) {
+        if (!page.url().includes('/audio-bible/')) {
+            console.log(`Switching back to audio version: ${audioUrl}`);
+            await page.goto(audioUrl);
+        }
+        await downloadAudio(page, fileNameBase, chapterPath);
+    }
 
-    // 3. Move to next chapter (this stays in the /audio-bible/ context)
+    // 4. Move to next chapter
     await navigateToNextPage(page);
     await page.waitForTimeout(3000);
+
+    return { shouldStop: false, currentBookName: info.book };
 }
 
 (async () => {
     const browser = await chromium.launch({ headless: false });
     const page = await browser.newPage();
-    await page.goto(baseUrlAudio);
+
+    console.log(`Starting download from: ${initialUrl}`);
+    await page.goto(initialUrl);
 
     let counter = 1;
-    while (counter <= 100) {
-        console.log(`Processing chapter ${counter}...`);
+    let initialBookName = null;
+    const loopLimit = config.downloadUntilEnd ? Infinity : config.maxIterations;
+
+    while (counter <= loopLimit) {
+        console.log(`\n--- Iteration ${counter} ---`);
         try {
-            await processChapter(page, counter);
+            const result = await processChapter(page, counter, initialBookName);
+
+            if (result.shouldStop) {
+                break;
+            }
+
+            // Set the initial book name on the first successful iteration
+            if (!initialBookName) {
+                initialBookName = result.currentBookName;
+            }
         } catch (err) {
-            console.error(`Stopped at counter ${counter} due to error.`);
+            console.log(`Stopping: No more chapters found or error occurred: ${err.message}`);
             break;
         }
         counter++;
@@ -108,4 +226,5 @@ async function processChapter(page, counter) {
 
     await page.close();
     await browser.close();
+    console.log('\nProcessing complete.');
 })();
