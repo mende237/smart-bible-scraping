@@ -9,14 +9,14 @@ const { downloadAudio } = require('./audioDownloader');
  * Edit these values to target specific books or chapters.
  */
 const config = {
-    bookCode: 'MAT',     // USFM code: MAT (Matthew), MRK (Mark), LUK (Luke), JHN (John), etc.
+    bookCode: 'JUD',     // USFM code: MAT (Matthew), MRK (Mark), LUK (Luke), JHN (John), etc.
     startChapter: 1,     // Chapter to start from
     versionCode: 'NTE12',// Bible version code
     versionId: '1854',   // Bible version numeric ID
     downloadFolder: '../data',
     maxIterations: 100,  // Safety limit if downloadUntilEnd is false
     stopAtBookEnd: true, // Stop when the book changes (e.g. MAT -> MRK)
-    downloadUntilEnd: false // If true, ignore stopAtBookEnd and maxIterations, keep going until no "Next" button
+    downloadUntilEnd: true // If true, ignore stopAtBookEnd and maxIterations, keep going until no "Next" button
 };
 
 // Construct the initial URL based on configuration
@@ -119,7 +119,7 @@ async function processChapter(page, counter, initialBookName) {
 (async () => {
     const browser = await chromium.launch({ headless: false });
     const page = await browser.newPage();
-    
+
     console.log(`Starting download from: ${baseUrlAudio}`);
     await page.goto(baseUrlAudio);
 
@@ -131,7 +131,7 @@ async function processChapter(page, counter, initialBookName) {
         console.log(`\n--- Iteration ${counter} ---`);
         try {
             const result = await processChapter(page, counter, initialBookName);
-            
+
             if (result.shouldStop) {
                 break;
             }
