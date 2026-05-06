@@ -4,12 +4,12 @@ const path = require('path');
 const { downloadText } = require('./textDownloader');
 const { downloadAudio } = require('./audioDownloader');
 
-language = "french"
-
+const language = "french"; // Change to "ewondo" for Ewondo language. This will set the correct version code and ID for the Bible.
+let reachLastBooKToStop = false; // Set to true if you want to stop when the book changes (e.g. from MAT to MRK)
 
 let versionCode = 'S21'; // Bible version code: NTE12 for ewondo; S21 for french
 let versionId = '152';   // Bible version numeric ID: 1854 for ewondo; 152 for french
-let downloadFolder = '../data/default';
+let downloadFolder = '../data/ewondo';
 let shouldDownloadText = true;
 let shouldDownloadAudio = false;
 
@@ -17,13 +17,13 @@ let shouldDownloadAudio = false;
 if (language === "french") {
     versionCode = 'S21';
     versionId = '152';
-    downloadFolder = '../data/french';
+    // downloadFolder = '../data/default';
     shouldDownloadText = true;
     shouldDownloadAudio = false;
 } else if (language === "ewondo") {
     versionCode = 'NTE12';
     versionId = '1854';
-    downloadFolder = '../data/default';
+    // downloadFolder = '../data/default';
     shouldDownloadText = true;
     shouldDownloadAudio = true;
 }
@@ -42,7 +42,8 @@ const config = {
     stopAtBookEnd: true, // Stop when the book changes (e.g. MAT -> MRK)
     downloadUntilEnd: true, // If true, ignore stopAtBookEnd and maxIterations, keep going until no "Next" button
     shouldDownloadText,
-    shouldDownloadAudio
+    shouldDownloadAudio,
+    stopBookCode: 'REV' // Optional: If set, will stop when it reaches this book (e.g. "MRK" for Mark)
 };
 
 // Construct the initial URLs based on configuration
@@ -130,7 +131,7 @@ async function navigateToNextPage(page) {
     throw new Error('All attempts to click Next Chapter button failed.');
 }
 
-async function processChapter(page, counter, initialBookName) {
+async function processChapter(page, counter, initialBookCode) {
     const currentUrl = page.url();
     let audioUrl, textUrl;
 
@@ -142,6 +143,11 @@ async function processChapter(page, counter, initialBookName) {
         audioUrl = currentUrl.replace('/bible/', '/audio-bible/');
     }
 
+    // Extract book code from URL (e.g., https://.../MAT.1.S21 -> MAT)
+    const urlParts = currentUrl.split('/');
+    const biblePart = urlParts[urlParts.length - 1];
+    const bookCode = biblePart.split('.')[0];
+
     // 1. Get Metadata (Book and Chapter)
     // We can get this from either page, but let's ensure we are on one of them
     const info = await getBookTitleAndChapter(page);
@@ -151,21 +157,40 @@ async function processChapter(page, counter, initialBookName) {
 
     console.log(`Current position: ${info.book} ${info.chapter}`);
 
-    // Check if we should stop because the book changed
-    if (!config.downloadUntilEnd && config.stopAtBookEnd && initialBookName && info.book !== initialBookName) {
-        console.log(`Book changed from ${initialBookName} to ${info.book}. Stopping.`);
+    if (config.stopBookCode && bookCode === config.stopBookCode) {
+        console.log(`Reached stopBookCode ${config.stopBookCode}.`);
+        reachLastBooKToStop = true;
+    }
+
+    if (reachLastBooKToStop && bookCode !== config.stopBookCode) {
+        console.log(`Book changed from ${config.stopBookCode} to ${bookCode}. Stopping.`);
         return { shouldStop: true };
     }
 
-    let bookNameSafe = info.book.replace(/[\s.]+/g, '_').toLowerCase();
-    let fileNameBase = `${bookNameSafe}_${info.chapter}`;
+    // Check if we should stop because the book changed
+    if (!config.downloadUntilEnd && config.stopAtBookEnd && initialBookCode && bookCode !== initialBookCode) {
+        console.log(`Book changed from ${initialBookCode} to ${bookCode}. Stopping.`);
+        return { shouldStop: true };
+    }
 
-    // Create nested folder structure: data/book/book_chapter/
-    const bookPath = path.join(config.downloadFolder, bookNameSafe);
+    let fileNameBase = `${bookCode}_${info.chapter}`;
+
+    // Create nested folder structure: data/bookCode/bookCode_chapter/
+    const bookPath = path.join(config.downloadFolder, bookCode);
     const chapterPath = path.join(bookPath, fileNameBase);
 
     if (!fs.existsSync(chapterPath)) {
         fs.mkdirSync(chapterPath, { recursive: true });
+    }
+
+
+    // 3. Download Audio if requested
+    if (config.shouldDownloadAudio) {
+        if (!page.url().includes('/audio-bible/')) {
+            console.log(`Switching back to audio version: ${audioUrl}`);
+            await page.goto(audioUrl);
+        }
+        await downloadAudio(page, `${fileNameBase}_${language}`, chapterPath);
     }
 
     // 2. Download Text if requested
@@ -174,23 +199,15 @@ async function processChapter(page, counter, initialBookName) {
             console.log(`Switching to text version: ${textUrl}`);
             await page.goto(textUrl);
         }
-        await downloadText(page, fileNameBase, chapterPath);
+        await downloadText(page, `${fileNameBase}_${language}`, chapterPath);
     }
 
-    // 3. Download Audio if requested
-    if (config.shouldDownloadAudio) {
-        if (!page.url().includes('/audio-bible/')) {
-            console.log(`Switching back to audio version: ${audioUrl}`);
-            await page.goto(audioUrl);
-        }
-        await downloadAudio(page, fileNameBase, chapterPath);
-    }
 
     // 4. Move to next chapter
     await navigateToNextPage(page);
     await page.waitForTimeout(3000);
 
-    return { shouldStop: false, currentBookName: info.book };
+    return { shouldStop: false, currentBookCode: bookCode };
 }
 
 (async () => {
@@ -201,21 +218,21 @@ async function processChapter(page, counter, initialBookName) {
     await page.goto(initialUrl);
 
     let counter = 1;
-    let initialBookName = null;
+    let initialBookCode = null;
     const loopLimit = config.downloadUntilEnd ? Infinity : config.maxIterations;
 
     while (counter <= loopLimit) {
         console.log(`\n--- Iteration ${counter} ---`);
         try {
-            const result = await processChapter(page, counter, initialBookName);
+            const result = await processChapter(page, counter, initialBookCode);
 
             if (result.shouldStop) {
                 break;
             }
 
             // Set the initial book name on the first successful iteration
-            if (!initialBookName) {
-                initialBookName = result.currentBookName;
+            if (!initialBookCode) {
+                initialBookCode = result.currentBookCode;
             }
         } catch (err) {
             console.log(`Stopping: No more chapters found or error occurred: ${err.message}`);
