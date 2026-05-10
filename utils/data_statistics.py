@@ -2,7 +2,6 @@ import os
 import argparse
 import statistics
 import json
-from pydub.utils import make_chunks
 from pydub import AudioSegment
 
 
@@ -74,7 +73,6 @@ def get_statictics(data_folder):
             del stats[language]["durations"]
             del stats[language]["total_duration_seconds"]
     
-    print(stats)
     with open(f'{data_folder}/statistics.json', 'w', encoding='utf-8') as f:
         json.dump(stats, f, indent=4)
     return stats

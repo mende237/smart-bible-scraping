@@ -29,3 +29,7 @@ coverage/
 out/
 
 data/
+
+# Python cache
+__pycache__/
+*.py[cod]
