@@ -13,7 +13,8 @@ A modular toolkit designed to scrape audio and text versions of the Bible from [
 ### Features
 - **Dual Format**: Downloads both `.txt` (clean verses) and `.mp3` (audio) for every chapter.
 - **Smart Organization**: Automatically groups files into nested folders: `data/<language>/<book>/<book_chapter>/`.
-- **Targeted Scraping**: Configure specific books, starting chapters, or versions.
+- **Targeted Scraping**: Configure specific books, starting chapters, or versions. Option to download only a single chapter.
+- **Customizable Settings**: Extensive command-line arguments for dynamic scraping (`--language`, `--book`, `--chapter`, `--suffix`, `--text-only`, `--single-chapter`).
 - **Continuous Mode**: Optional "Download Until End" mode to scrape entire books automatically.
 
 ### Prerequisites
@@ -30,6 +31,12 @@ A modular toolkit designed to scrape audio and text versions of the Bible from [
 2. Start the scraper:
    ```bash
    node src/scrapping.js
+
+   # You can also specify custom parameters:
+   node src/scrapping.js --suffix original
+   
+   # Example: Download only the text for chapter 1 of Mark in Ewondo:
+   node src/scrapping.js --language ewondo --book MRK --chapter 1 --text-only --single-chapter --suffix original
    ```
 
 ## 2. Data Pre-processing Module

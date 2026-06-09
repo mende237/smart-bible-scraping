@@ -4,28 +4,55 @@ const path = require('path');
 const { downloadText } = require('./textDownloader');
 const { downloadAudio } = require('./audioDownloader');
 
-const language = "french"; // Change to "ewondo" for Ewondo language. This will set the correct version code and ID for the Bible.
 let reachLastBooKToStop = false; // Set to true if you want to stop when the book changes (e.g. from MAT to MRK)
+
+// Parse command-line arguments
+let cmdLanguage = 'french'; // Default language
+let cmdFileNameSuffix = '';
+let cmdBookCode = 'MAT';
+let cmdStartChapter = 1;
+let cmdTextOnly = false;
+let cmdSingleChapter = false;
+
+for (let i = 2; i < process.argv.length; i++) {
+    const arg = process.argv[i];
+    if (arg.startsWith('--language')) {
+        cmdLanguage = arg.includes('=') ? arg.split('=')[1] : process.argv[++i];
+    } else if (arg.startsWith('--suffix')) {
+        cmdFileNameSuffix = arg.includes('=') ? arg.split('=')[1] : process.argv[++i];
+    } else if (arg.startsWith('--book')) {
+        cmdBookCode = arg.includes('=') ? arg.split('=')[1] : process.argv[++i];
+    } else if (arg.startsWith('--chapter')) {
+        cmdStartChapter = parseInt(arg.includes('=') ? arg.split('=')[1] : process.argv[++i], 10);
+    } else if (arg === '--text-only') {
+        cmdTextOnly = true;
+    } else if (arg === '--single-chapter') {
+        cmdSingleChapter = true;
+    }
+}
+
+const language = cmdLanguage;
 
 let versionCode = 'S21'; // Bible version code: NTE12 for ewondo; S21 for french
 let versionId = '152';   // Bible version numeric ID: 1854 for ewondo; 152 for french
-let downloadFolder = '../data/ewondo';
+let downloadFolder = `../data/${language}`;
 let shouldDownloadText = true;
 let shouldDownloadAudio = false;
-
 
 if (language === "french") {
     versionCode = 'S21';
     versionId = '152';
-    // downloadFolder = '../data/default';
     shouldDownloadText = true;
     shouldDownloadAudio = false;
 } else if (language === "ewondo") {
     versionCode = 'NTE12';
     versionId = '1854';
-    // downloadFolder = '../data/default';
     shouldDownloadText = true;
     shouldDownloadAudio = true;
+}
+
+if (cmdTextOnly) {
+    shouldDownloadAudio = false;
 }
 
 /**
@@ -33,14 +60,16 @@ if (language === "french") {
  * Edit these values to target specific books or chapters.
  */
 const config = {
-    bookCode: 'MAT',     // USFM code: MAT (Matthew), MRK (Mark), LUK (Luke), JHN (John), etc.
-    startChapter: 1,     // Chapter to start from
+    bookCode: cmdBookCode,     // USFM code: MAT (Matthew), MRK (Mark), LUK (Luke), JHN (John), etc.
+    startChapter: cmdStartChapter,     // Chapter to start from
     versionCode,
     versionId,
     downloadFolder,
     maxIterations: 100,  // Safety limit if downloadUntilEnd is false
     stopAtBookEnd: true, // Stop when the book changes (e.g. MAT -> MRK)
     downloadUntilEnd: true, // If true, ignore stopAtBookEnd and maxIterations, keep going until no "Next" button
+    downloadOnlyOneChapter: cmdSingleChapter, // Set to true to download only the startChapter
+    fileNameSuffix: cmdFileNameSuffix, // Optional suffix to append to the downloaded file names (e.g., 'original')
     shouldDownloadText,
     shouldDownloadAudio,
     stopBookCode: 'REV' // Optional: If set, will stop when it reaches this book (e.g. "MRK" for Mark)
@@ -183,6 +212,7 @@ async function processChapter(page, counter, initialBookCode) {
         fs.mkdirSync(chapterPath, { recursive: true });
     }
 
+    const fileSuffix = config.fileNameSuffix ? (config.fileNameSuffix.startsWith('_') ? config.fileNameSuffix : `_${config.fileNameSuffix}`) : '';
 
     // 3. Download Audio if requested
     if (config.shouldDownloadAudio) {
@@ -190,7 +220,7 @@ async function processChapter(page, counter, initialBookCode) {
             console.log(`Switching back to audio version: ${audioUrl}`);
             await page.goto(audioUrl);
         }
-        await downloadAudio(page, `${fileNameBase}_${language}`, chapterPath);
+        await downloadAudio(page, `${fileNameBase}_${language}${fileSuffix}`, chapterPath);
     }
 
     // 2. Download Text if requested
@@ -199,7 +229,12 @@ async function processChapter(page, counter, initialBookCode) {
             console.log(`Switching to text version: ${textUrl}`);
             await page.goto(textUrl);
         }
-        await downloadText(page, `${fileNameBase}_${language}`, chapterPath);
+        await downloadText(page, `${fileNameBase}_${language}${fileSuffix}`, chapterPath);
+    }
+
+    if (config.downloadOnlyOneChapter) {
+        console.log('Configured to download only one chapter. Stopping.');
+        return { shouldStop: true, currentBookCode: bookCode };
     }
 
 
