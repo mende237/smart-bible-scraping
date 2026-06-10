@@ -67,7 +67,31 @@ python generate_verses_folder.py --data_folder ../scraping/data/ewondo
 python generate_utterance_file.py --data_folder ../scraping/data/ewondo
 ```
 
-## 3. Utilities Module
+## 3. Data Verification Module
+
+### Features
+- **Automated Verification**: Compares segmented audio transcriptions against the original scraped text to ensure accuracy.
+- **Auto-Recovery**: Automatically downloads and pre-processes missing reference text from Bible.com if it's not found in the local data folder.
+- **Granular Control**: Supports verification at the verse, chapter, book, or preprocessor assignment level.
+- **Detailed Logging**: Logs all mismatches and missing files to `data-verification/logs/verification_errors.log`.
+
+### Usage
+```bash
+cd data-verification
+# Verify a specific preprocessor's workload (requires assignement.json)
+python verify_data.py --preprocessor pre_processor_1
+
+# Verify a specific book
+python verify_data.py --book MAT
+
+# Verify a specific chapter
+python verify_data.py --book MAT --chapter MAT_1
+
+# Verify a specific verse
+python verify_data.py --book MAT --chapter MAT_1 --verse V_1
+```
+
+## 4. Utilities Module
 
 ### Scripts
 - **`data_statistics.py`**: Analyzes the scraped data to generate `statistics.json`, containing metrics like total books, chapters, verses, and audio duration (mean, median, max, min) for each language.

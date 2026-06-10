@@ -3,6 +3,7 @@ import re
 import subprocess
 import logging
 import argparse
+import json
 
 # Configure logging to output to a file in the data-verification folder
 log_file_path = os.path.join(os.path.dirname(__file__), 'logs', 'verification_errors.log')
@@ -201,6 +202,50 @@ def verify_book(data_path, book):
         
     return failed_chapters
 
+
+def verify_preprocessor(data_path, preprocessor_name):
+    logging.info(f"Starting verification for preprocessor: {preprocessor_name}")
+    assignment_file = os.path.join(data_path, "assignement.json")
+    
+    if not os.path.exists(assignment_file):
+        raise FileNotFoundError(f"Assignment file not found: {assignment_file}")
+        
+    with open(assignment_file, 'r', encoding='utf-8') as f:
+        assignments = json.load(f)
+        
+    if preprocessor_name not in assignments:
+        raise ValueError(f"Preprocessor '{preprocessor_name}' not found in assignment file.")
+        
+    preprocessor_tasks = assignments[preprocessor_name]
+    
+    failed_tasks = {}
+    for book, chapters in preprocessor_tasks.items():
+        if book == "total_duration_hours":
+            continue
+            
+        if chapters == "all":
+            failed_chapters = verify_book(data_path, book)
+            if failed_chapters:
+                failed_tasks[book] = failed_chapters
+        else:
+            for chapter in chapters:
+                failed_verses = verify_chapter(data_path, book, chapter)
+                if failed_verses:
+                    if book not in failed_tasks:
+                        failed_tasks[book] = {}
+                    failed_tasks[book][chapter] = failed_verses
+                    
+    if failed_tasks:
+        summary_msg = f"\nPreprocessor {preprocessor_name} verification completed with errors."
+        print(summary_msg)
+        logging.warning(summary_msg.strip())
+    else:
+        success_msg = f"\nAll assigned tasks for preprocessor {preprocessor_name} verified successfully!"
+        print(success_msg)
+        logging.info(success_msg.strip())
+        
+    return failed_tasks
+
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Verify verse transcriptions against the expected text.')
@@ -213,7 +258,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--book',
         type=str,
-        required=True,
+        default=None,
         help='Specific book to process (e.g., LUK).'
     )
     parser.add_argument(
@@ -228,13 +273,25 @@ if __name__ == "__main__":
         default=None,
         help='Specific verse to process (e.g., V_1).'
     )
+    parser.add_argument(
+        '--preprocessor',
+        type=str,
+        default=None,
+        help='Specific preprocessor to verify (e.g., pre_processor_1). Requires assignement.json in data folder.'
+    )
     args = parser.parse_args()
     
-    if args.verse:
-        if not args.chapter:
-            parser.error("--chapter is required when --verse is specified.")
+    if args.preprocessor:
+        verify_preprocessor(args.data_folder, args.preprocessor)
+    elif args.verse:
+        if not args.book or not args.chapter:
+            parser.error("--book and --chapter are required when --verse is specified.")
         verify_verse(args.data_folder, args.book, args.chapter, args.verse)
     elif args.chapter:
+        if not args.book:
+            parser.error("--book is required when --chapter is specified.")
         verify_chapter(args.data_folder, args.book, args.chapter)
-    else:
+    elif args.book:
         verify_book(args.data_folder, args.book)
+    else:
+        parser.error("You must specify either --preprocessor, or --book.")
