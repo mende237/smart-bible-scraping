@@ -6,6 +6,7 @@ A modular toolkit designed to scrape audio and text versions of the Bible from [
 
 - `scraping/`: Node.js tool powered by **Playwright** to automatically download text and audio versions of chapters.
 - `data-pre-processing/`: Python scripts to organize, clean, and map scraped data.
+- `data-verification/`: Python scripts to verify transcriptions against expected original text and log errors.
 - `utils/`: Helper scripts for data analysis and task distribution.
 
 ## 1. Scraping Module
@@ -14,7 +15,7 @@ A modular toolkit designed to scrape audio and text versions of the Bible from [
 - **Dual Format**: Downloads both `.txt` (clean verses) and `.mp3` (audio) for every chapter.
 - **Smart Organization**: Automatically groups files into nested folders: `data/<language>/<book>/<book_chapter>/`.
 - **Targeted Scraping**: Configure specific books, starting chapters, or versions. Option to download only a single chapter.
-- **Customizable Settings**: Extensive command-line arguments for dynamic scraping (`--language`, `--book`, `--chapter`, `--suffix`, `--text-only`, `--single-chapter`).
+- **Customizable Settings**: Extensive command-line arguments for dynamic scraping (`--language`, `--book`, `--chapter`, `--suffix`, `--text-only`, `--single-chapter`, `--download-folder`).
 - **Continuous Mode**: Optional "Download Until End" mode to scrape entire books automatically.
 
 ### Prerequisites
@@ -37,6 +38,9 @@ A modular toolkit designed to scrape audio and text versions of the Bible from [
    
    # Example: Download only the text for chapter 1 of Mark in Ewondo:
    node src/scrapping.js --language ewondo --book MRK --chapter 1 --text-only --single-chapter --suffix original
+
+   # Example: Download to a custom folder:
+   node src/scrapping.js --download-folder /path/to/custom/folder
    ```
 
 ## 2. Data Pre-processing Module
@@ -54,6 +58,9 @@ cd data-pre-processing
 python main.py
 # 2. Clean up verse formatting
 python pre_process_verses.py --data_folder ../scraping/data/ewondo
+
+# You can also process a specific chapter:
+python pre_process_verses.py --book MAT --chapter MAT_1
 # 3. Create verse sub-folders
 python generate_verses_folder.py --data_folder ../scraping/data/ewondo
 # 4. Monitor for new audio segments (run in background during segmentation)

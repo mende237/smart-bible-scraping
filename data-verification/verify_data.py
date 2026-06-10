@@ -1,8 +1,25 @@
 import os
 import re
 import subprocess
+import logging
+import argparse
+
+# Configure logging to output to a file in the data-verification folder
+log_file_path = os.path.join(os.path.dirname(__file__), 'logs', 'verification_errors.log')
+os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+logging.basicConfig(
+    filename=log_file_path,
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 language = "ewondo"
+
+
+def remove_ponctuation(text):
+    ponctuation_pattern = r'[^\w\s]'
+    cleaned_text = re.sub(ponctuation_pattern, '', text)
+    return cleaned_text.strip().lower()
 
 
 def download_text_chapter_if_missing(data_path, book, chapter):
@@ -27,27 +44,30 @@ def download_text_chapter_if_missing(data_path, book, chapter):
                 "--text-only",
                 "--single-chapter",
                 "--suffix", "original",
-                "--language", language
+                "--language", language,
+                "--download-folder", data_path
             ], check=True)
             print(f"Successfully downloaded text for {chapter}.")
+            
+            pre_process_script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data-pre-processing', 'pre_process_verses.py'))
+            print(f"Pre-processing downloaded text for {chapter}...")
+            subprocess.run([
+                "python", pre_process_script_path,
+                "--data_folder", data_path,
+                "--book", book,
+                "--chapter", chapter
+            ], check=True)
+            print(f"Successfully pre-processed text for {chapter}.")
         except subprocess.CalledProcessError as e:
-            print(f"Error downloading text for {chapter}: {e}")
+            error_msg = f"Error downloading or pre-processing text for {chapter}: {e}"
+            print(error_msg)
+            logging.error(error_msg)
             
     return text_file_path
 
 
 def get_verse_text(data_path, book, chapter, verse):
     verse_folder = os.path.join(data_path, book, chapter, verse)
-    chapter_folder = os.path.join(data_path, book, chapter)
-    
-    
-    if not os.path.isdir(chapter_folder):
-        raise ValueError(f"Chapter folder not found: {chapter_folder}")
-    
-    
-    if not os.path.exists(os.path.join(chapter_folder, f"{chapter}_{language}_original.txt")):
-        chapter_text_file_path = download_text_chapter_if_missing(data_path, book, chapter)
-    
     
     if os.path.isdir(verse_folder):
         utt_files = {}
@@ -58,7 +78,9 @@ def get_verse_text(data_path, book, chapter, verse):
                 if os.path.exists(os.path.join(verse_folder, wav_file)):
                     utt_files[int(match.group(1))] = file
                 else:
-                    print(f"Warning: Missing corresponding .wav file for {file}")
+                    warning_msg = f"Warning: Missing corresponding .wav file for {file} in {verse_folder}"
+                    print(warning_msg)
+                    logging.warning(warning_msg)
         
         if utt_files:
             utt_numbers = sorted(utt_files.keys())
@@ -76,18 +98,107 @@ def get_verse_text(data_path, book, chapter, verse):
             return " ".join(texts)
     
 
-def verify_verse(data_path, book, chapter, verse, expected_text):
-    # This is a placeholder function. In a real implementation, this would
-    # retrieve the verse text from a data source and compare it to the expected text.
+def verify_verse(data_path, book, chapter, verse):
     actual_text = get_verse_text(data_path, book, chapter, verse)
-    assert actual_text == expected_text, f"Expected '{expected_text}', but got '{actual_text}'"
+    chapter_folder = os.path.join(data_path, book, chapter)
     
+
+    if not os.path.isdir(chapter_folder):
+        raise ValueError(f"Chapter folder not found: {chapter_folder}")
+    
+    chapter_text_file_path = os.path.join(chapter_folder, f"{chapter}_{language}_original.txt")
+    if not os.path.exists(chapter_text_file_path):
+        chapter_text_file_path = download_text_chapter_if_missing(data_path, book, chapter)
+        
+    verse_num = verse.split('_')[-1]
+    expected_text = None
+    
+    with open(chapter_text_file_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            match = re.match(rf'^\[{verse_num}\]\s*(.*)', line.strip())
+            if match:
+                expected_text = match.group(1)
+                break
+                
+    if expected_text is None:
+        raise ValueError(f"Verse {verse_num} not found in {chapter_text_file_path}")
+        
+    print(f"Actual text: '{actual_text}'")
+    print(f"Expected text: '{expected_text}'")
+    
+    actual_clean = remove_ponctuation(actual_text) if actual_text else ""
+    expected_clean = remove_ponctuation(expected_text)
+    
+    assert actual_clean == expected_clean, f"Expected '{expected_clean}', but got '{actual_clean}'"
+    print(f"Verse {verse} verification passed!")
+    
+
+def verify_chapter(data_path, book, chapter):
+    logging.info(f"Starting verification for {book} - {chapter}")
+    chapter_folder = os.path.join(data_path, book, chapter)
+    
+    if not os.path.isdir(chapter_folder):
+        raise ValueError(f"Chapter folder not found: {chapter_folder}")
+        
+    verse_folders = []
+    for item in os.listdir(chapter_folder):
+        if os.path.isdir(os.path.join(chapter_folder, item)) and re.match(r'^V_\d+$', item):
+            verse_folders.append(item)
+            
+    verse_folders.sort(key=lambda x: int(x.split('_')[1]))
+    
+    failed_verses = []
+    for verse in verse_folders:
+        try:
+            verify_verse(data_path, book, chapter, verse)
+        except Exception as e:
+            error_msg = f"Verification failed for {verse}: {e}"
+            print(error_msg)
+            logging.error(f"{book} {chapter} {verse} - {e}")
+            failed_verses.append(verse)
+            
+    if failed_verses:
+        summary_msg = f"\nChapter {chapter} verification completed with errors in verses: {', '.join(failed_verses)}"
+        print(summary_msg)
+        logging.warning(summary_msg.strip())
+    else:
+        success_msg = f"\nAll verses in chapter {chapter} verified successfully!"
+        print(success_msg)
+        logging.info(success_msg.strip())
+        
+    return failed_verses
+
+
     
 if __name__ == "__main__":
-    data_path = "../scraping/data/ewondo"
-    book = "LUK"
-    chapter = "LUK_1"
-    verse = "V_1"
-    expected_text = "In the beginning God created the heavens and the earth."
+    parser = argparse.ArgumentParser(description='Verify verse transcriptions against the expected text.')
+    parser.add_argument(
+        '--data_folder',
+        type=str,
+        default='../scraping/data/ewondo',
+        help='Path to the data folder containing the scraped files.'
+    )
+    parser.add_argument(
+        '--book',
+        type=str,
+        required=True,
+        help='Specific book to process (e.g., LUK).'
+    )
+    parser.add_argument(
+        '--chapter',
+        type=str,
+        required=True,
+        help='Specific chapter to process (e.g., LUK_1).'
+    )
+    parser.add_argument(
+        '--verse',
+        type=str,
+        default=None,
+        help='Specific verse to process (e.g., V_1).'
+    )
+    args = parser.parse_args()
     
-    verify_verse(data_path, book, chapter, verse, expected_text)
+    if args.verse:
+        verify_verse(args.data_folder, args.book, args.chapter, args.verse)
+    else:
+        verify_chapter(args.data_folder, args.book, args.chapter)

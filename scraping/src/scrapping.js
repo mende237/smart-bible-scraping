@@ -8,6 +8,7 @@ let reachLastBooKToStop = false; // Set to true if you want to stop when the boo
 
 // Parse command-line arguments
 let cmdLanguage = 'french'; // Default language
+let cmdDownloadFolder = null;
 let cmdFileNameSuffix = '';
 let cmdBookCode = 'MAT';
 let cmdStartChapter = 1;
@@ -18,6 +19,8 @@ for (let i = 2; i < process.argv.length; i++) {
     const arg = process.argv[i];
     if (arg.startsWith('--language')) {
         cmdLanguage = arg.includes('=') ? arg.split('=')[1] : process.argv[++i];
+    } else if (arg.startsWith('--download-folder')) {
+        cmdDownloadFolder = arg.includes('=') ? arg.split('=')[1] : process.argv[++i];
     } else if (arg.startsWith('--suffix')) {
         cmdFileNameSuffix = arg.includes('=') ? arg.split('=')[1] : process.argv[++i];
     } else if (arg.startsWith('--book')) {
@@ -35,7 +38,7 @@ const language = cmdLanguage;
 
 let versionCode = 'S21'; // Bible version code: NTE12 for ewondo; S21 for french
 let versionId = '152';   // Bible version numeric ID: 1854 for ewondo; 152 for french
-let downloadFolder = `../data/${language}`;
+let downloadFolder = cmdDownloadFolder || `../data/${language}`;
 let shouldDownloadText = true;
 let shouldDownloadAudio = false;
 
