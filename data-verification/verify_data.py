@@ -169,6 +169,38 @@ def verify_chapter(data_path, book, chapter):
     return failed_verses
 
 
+def verify_book(data_path, book):
+    logging.info(f"Starting verification for book: {book}")
+    book_folder = os.path.join(data_path, book)
+    
+    if not os.path.isdir(book_folder):
+        raise ValueError(f"Book folder not found: {book_folder}")
+        
+    chapter_folders = []
+    for item in os.listdir(book_folder):
+        if os.path.isdir(os.path.join(book_folder, item)) and item.startswith(f"{book}_"):
+            chapter_folders.append(item)
+            
+    # Sort chapters numerically based on the chapter number
+    chapter_folders.sort(key=lambda x: int(x.split('_')[1]) if len(x.split('_')) > 1 and x.split('_')[1].isdigit() else 0)
+    
+    failed_chapters = {}
+    for chapter in chapter_folders:
+        failed_verses = verify_chapter(data_path, book, chapter)
+        if failed_verses:
+            failed_chapters[chapter] = failed_verses
+            
+    if failed_chapters:
+        summary_msg = f"\nBook {book} verification completed with errors in chapters: {', '.join(failed_chapters.keys())}"
+        print(summary_msg)
+        logging.warning(summary_msg.strip())
+    else:
+        success_msg = f"\nAll chapters in book {book} verified successfully!"
+        print(success_msg)
+        logging.info(success_msg.strip())
+        
+    return failed_chapters
+
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Verify verse transcriptions against the expected text.')
@@ -187,7 +219,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--chapter',
         type=str,
-        required=True,
+        default=None,
         help='Specific chapter to process (e.g., LUK_1).'
     )
     parser.add_argument(
@@ -199,6 +231,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     if args.verse:
+        if not args.chapter:
+            parser.error("--chapter is required when --verse is specified.")
         verify_verse(args.data_folder, args.book, args.chapter, args.verse)
-    else:
+    elif args.chapter:
         verify_chapter(args.data_folder, args.book, args.chapter)
+    else:
+        verify_book(args.data_folder, args.book)
