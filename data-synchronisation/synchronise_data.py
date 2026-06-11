@@ -21,6 +21,7 @@ def main():
     parser.add_argument('--book', type=str, help='Specific book (e.g., MAT).')
     parser.add_argument('--chapter', type=str, help='Specific chapter (e.g., MAT_1).')
     parser.add_argument('--verse', type=str, help='Specific verse (e.g., V_1).')
+    parser.add_argument('--preprocessor', type=str, help='Specific preprocessor workload to sync (e.g., pre_processor_1).')
     parser.add_argument('--headless', action='store_true', help='Console mode auth.')
     parser.add_argument('--no-verify', action='store_true', help='Skip verification.')
     
@@ -36,16 +37,18 @@ def main():
 
     # 1. Verification Gate
     if not args.no_verify:
-        if not args.book:
-            parser.error("At least --book is required unless --no-verify is used.")
-        if not synchronizer.run_verification(data_path, args.book, args.chapter, args.verse):
+        if not args.book and not args.preprocessor:
+            parser.error("At least --book or --preprocessor is required unless --no-verify is used.")
+        if not synchronizer.run_verification(data_path, args.book, args.chapter, args.verse, args.preprocessor):
             return
 
     # 2. Sync Execution
     lang_id = synchronizer.get_or_create_folder(os.path.basename(data_path), PARENT_FOLDER_ID)
     if not lang_id: return
 
-    if args.verse:
+    if args.preprocessor:
+        synchronizer.sync_preprocessor(data_path, args.preprocessor, lang_id)
+    elif args.verse:
         if not args.book or not args.chapter:
             parser.error("--book and --chapter are required with --verse.")
         book_id = synchronizer.get_or_create_folder(args.book, lang_id)
@@ -59,7 +62,7 @@ def main():
     elif args.book:
         synchronizer.sync_book(data_path, args.book, lang_id)
     else:
-        parser.error("Specify --book, --chapter, or --verse.")
+        parser.error("Specify --book, --chapter, --verse, or --preprocessor.")
 
 if __name__ == '__main__':
     main()

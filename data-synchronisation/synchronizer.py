@@ -3,6 +3,7 @@ import mimetypes
 import subprocess
 import sys
 import logging
+import json
 from typing import Optional
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
@@ -69,7 +70,7 @@ class DataSynchronizer:
             else:
                 logging.error(f"Error importing '{file_name}': {error}")
 
-    def run_verification(self, data_path: str, book: str = None, chapter: str = None, verse: str = None) -> bool:
+    def run_verification(self, data_path: str, book: str = None, chapter: str = None, verse: str = None, preprocessor: str = None) -> bool:
         """Runs the external verification script."""
         logging.info("="*50)
         logging.info("STARTING DATA VERIFICATION")
@@ -77,7 +78,8 @@ class DataSynchronizer:
         
         script_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'data-verification', 'verify_data.py'))
         cmd = [sys.executable, script_path, '--data_folder', data_path]
-        if verse: cmd.extend(['--book', book, '--chapter', chapter, '--verse', verse])
+        if preprocessor: cmd.extend(['--preprocessor', preprocessor])
+        elif verse: cmd.extend(['--book', book, '--chapter', chapter, '--verse', verse])
         elif chapter: cmd.extend(['--book', book, '--chapter', chapter])
         elif book: cmd.extend(['--book', book])
         
@@ -91,6 +93,36 @@ class DataSynchronizer:
         except Exception as e:
             logging.error(f"Verification execution error: {e}")
             return False
+
+    def sync_preprocessor(self, data_path: str, preprocessor_name: str, parent_id: str):
+        """Synchronizes all tasks assigned to a specific preprocessor."""
+        assignment_file = os.path.join(data_path, "assignment.json")
+        
+        if not os.path.exists(assignment_file):
+            logging.error(f"Assignment file not found: {assignment_file}")
+            return
+
+        with open(assignment_file, 'r', encoding='utf-8') as f:
+            assignments = json.load(f)
+            
+        if preprocessor_name not in assignments:
+            logging.error(f"Preprocessor '{preprocessor_name}' not found in assignment file.")
+            return
+            
+        preprocessor_tasks = assignments[preprocessor_name]
+        logging.info(f"Syncing all tasks for preprocessor: {preprocessor_name}")
+
+        for book, chapters in preprocessor_tasks.items():
+            if book == "total_duration_hours":
+                continue
+                
+            if chapters == "all":
+                self.sync_book(data_path, book, parent_id)
+            else:
+                book_id = self.get_or_create_folder(book, parent_id)
+                if not book_id: continue
+                for chapter in chapters:
+                    self.sync_chapter(data_path, book, chapter, book_id)
 
     def sync_verse(self, data_path: str, book: str, chapter: str, verse: str, parent_id: str):
         """Synchronizes a single verse."""
