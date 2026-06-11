@@ -7,6 +7,7 @@ A modular toolkit designed to scrape audio and text versions of the Bible from [
 - `scraping/`: Node.js tool powered by **Playwright** to automatically download text and audio versions of chapters.
 - `data-pre-processing/`: Python scripts to organize, clean, and map scraped data.
 - `data-verification/`: Python scripts to verify transcriptions against expected original text and log errors.
+- `data-synchronisation/`: Python scripts to sync local data with Google Drive.
 - `utils/`: Helper scripts for data analysis and task distribution.
 
 ## 1. Scraping Module
@@ -106,7 +107,87 @@ python data_statistics.py --data_folder ../scraping/data/ewondo
 python assigning_data_to_pre_pocessors.py --data_folder ../scraping/data/ewondo --nbr_pre_processors 5
 ```
 
+## 5. Data Synchronisation Module
+
+### Features
+- **Cloud Backup**: Synchronizes local data with Google Drive to ensure work is safely backed up and accessible.
+- **Granular Sync**: Supports synchronization at the book, chapter, or verse level.
+- **Dual Authentication**: Supports both **Service Accounts** and **OAuth2 User Authentication** (recommended to use your personal storage quota).
+- **Headless Mode**: Special flag for authenticating on remote servers without browser access.
+- **Automatic Mirroring**: Automatically recreates the local folder structure on Google Drive.
+
+### Setup
+1. **Create a Google Cloud Project:**
+   - Go to the [Google Cloud Console](https://console.cloud.google.com/).
+   - Create a new project (e.g., "Smart-Transcribe").
+2. **Enable Google Drive API:**
+   - Navigate to **APIs & Services > Library**.
+   - Search for "Google Drive API" and click **Enable**.
+3. **Configure OAuth Consent Screen (Required for OAuth2):**
+   - Go to **APIs & Services > OAuth consent screen**.
+   - Choose **External** and fill in the required app information.
+   - **Test Users (Crucial):** Scroll down to "Test users" and add **every Gmail address** (yours and your collaborators') that will use the script. 
+     - *Note:* If an email is not added here, the user will get an **"Error 403: access_denied"** when trying to log in.
+   - **Note on Security Warning:** Since the app is not verified by Google, you will see a "Google hasn't verified this app" message during the first login. Click **Advanced** and then **Go to Smart-Transcribe (unsafe)** to proceed.
+4. **Obtain Credentials:**
+   - **For `client-secret.json` (Personal Quota - Recommended):**
+     - Go to **APIs & Services > Credentials**.
+     - Click **Create Credentials > OAuth client ID**.
+     - Select **Desktop app**, name it, and download the JSON.
+     - Rename it to `client-secret.json` and place it in the `account/` folder.
+   - **For `service-account.json` (Optional):**
+     - Click **Create Credentials > Service Account**.
+     - Follow the steps to create it, then go to the **Keys** tab of the new account.
+     - Click **Add Key > Create new key (JSON)**.
+     - Rename the downloaded file to `service-account.json` and place it in the `account/` folder.
+5. **Configure Environment:**
+   - Configure your target Drive folder in the `.env` file:
+     ```env
+     DRIVE_FOLDER_ID=your_folder_id_here
+     ```
+   - **Sharing:** Ensure the target Google Drive folder is **shared** with the email address of the Service Account (if used) or that your personal account has "Editor" access to it.
+
+### Usage
+```bash
+cd data-synchronisation
+# Synchronize a specific book
+python synchronise_data.py --book MAT
+
+# Synchronize a specific chapter
+python synchronise_data.py --book MAT --chapter MAT_1
+
+# Synchronize a specific verse
+python synchronise_data.py --book MAT --chapter MAT_1 --verse V_1
+
+# Synchronize on a remote server (SSH)
+python synchronise_data.py --book MAT --headless
+```
+
 ## Folder Structure After Processing
+```
+scraping/data/
+├── ewondo/
+│   └── MAT/
+│       └── MAT_1/
+│           ├── MAT_1.mp3      (Full Chapter Audio)
+│           ├── MAT_1.txt      (Cleaned Ewondo Text)
+│           ├── MAT_1_fr.txt   (French Text - for alignment)
+│           ├── V_1/           (Verse-specific folder)
+│           │   ├── V_1_UTT_1.wav  (Segmented Audio)
+│           │   └── V_1_UTT_1.txt  (Utterance Transcription)
+│           └── V_2/           ...
+└── french/
+    └── MAT/
+        └── MAT_1/
+            └── MAT_1.txt
+```
+
+## Troubleshooting
+
+- **Timeout Error**: Might be due to slow page loads or cookie consent popups.
+- **Selector Changes**: The scraper depends on Bible.com's CSS classes. If the site layout changes, update selectors in `src/scrapping.js` or `src/textDownloader.js`.
+- **wget not found**: Ensure `wget` is available in your PATH.
+- **Mapping Errors**: Check `map/book-title-mapping-final.json` for correct folder name mappings.
 ```
 scraping/data/
 ├── ewondo/
