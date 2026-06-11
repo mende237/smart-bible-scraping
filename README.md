@@ -113,7 +113,8 @@ python assigning_data_to_pre_pocessors.py --data_folder ../scraping/data/ewondo 
 
 ### Features
 - **Cloud Backup**: Synchronizes local data with Google Drive to ensure work is safely backed up and accessible.
-- **Verification Gate**: **Mandatory automated verification** before synchronization. If verification fails, the sync is aborted to protect data integrity on the Cloud.
+- **Verification Gate**: Automated verification before synchronization.
+- **Partial Sync**: **Smart synchronization logic** that skips individual verses that fail verification while still uploading those that pass.
 - **Preprocessor Support**: Effortlessly synchronize an entire workload assigned to a specific preprocessor.
 - **Granular Sync**: Supports synchronization at the book, chapter, or verse level.
 - **Dual Authentication**: Supports both **Service Accounts** and **OAuth2 User Authentication** (recommended to use your personal storage quota).

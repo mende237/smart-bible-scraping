@@ -2,6 +2,7 @@ import os
 import argparse
 import logging
 import sys
+import json
 
 # Add the current directory to sys.path to allow relative-like imports if needed
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -52,31 +53,56 @@ if __name__ == "__main__":
         '--preprocessor',
         type=str,
         default=None,
-        help='Specific preprocessor to verify (e.g., pre_processor_1). Requires assignement.json in data folder.'
+        help='Specific preprocessor to verify (e.g., pre_processor_1). Requires assignment.json in data folder.'
+    )
+    parser.add_argument(
+        '--json',
+        action='store_true',
+        help='Output failures in JSON format to stdout.'
     )
     args = parser.parse_args()
     
+    results = {"failed": False, "failures": {}}
+    
     try:
         if args.preprocessor:
-            failed = verify_preprocessor(args.data_folder, args.preprocessor, LANGUAGE)
-            if failed:
-                sys.exit(1)
+            failures = verify_preprocessor(args.data_folder, args.preprocessor, LANGUAGE)
+            results["failures"] = failures
         elif args.verse:
             if not args.book or not args.chapter:
                 parser.error("--book and --chapter are required when --verse is specified.")
-            verify_verse(args.data_folder, args.book, args.chapter, args.verse, LANGUAGE)
+            success = verify_verse(args.data_folder, args.book, args.chapter, args.verse, LANGUAGE)
+            if not success:
+                results["failures"] = {args.book: {args.chapter: [args.verse]}}
         elif args.chapter:
             if not args.book:
                 parser.error("--book is required when --chapter is specified.")
-            failed = verify_chapter(args.data_folder, args.book, args.chapter, LANGUAGE)
-            if failed:
-                sys.exit(1)
+            failures = verify_chapter(args.data_folder, args.book, args.chapter, LANGUAGE)
+            if failures:
+                results["failures"] = {args.book: {args.chapter: failures}}
         elif args.book:
-            failed = verify_book(args.data_folder, args.book, LANGUAGE)
-            if failed:
-                sys.exit(1)
+            failures = verify_book(args.data_folder, args.book, LANGUAGE)
+            if failures:
+                results["failures"] = {args.book: failures}
         else:
             parser.error("You must specify either --preprocessor, or --book.")
+            
+        if results["failures"]:
+            results["failed"] = True
+            
+        if args.json:
+            print("---JSON_START---")
+            print(json.dumps(results))
+            print("---JSON_END---")
+            
+        if results["failed"] and not args.json:
+            sys.exit(1)
+            
     except Exception as e:
-        print(f"Verification error: {e}")
+        if args.json:
+            print("---JSON_START---")
+            print(json.dumps({"failed": True, "error": str(e)}))
+            print("---JSON_END---")
+        else:
+            print(f"Verification error: {e}")
         sys.exit(1)

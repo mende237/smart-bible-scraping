@@ -4,7 +4,7 @@ import subprocess
 import sys
 import logging
 import json
-from typing import Optional
+from typing import Optional, Dict, List
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
 try:
@@ -15,6 +15,7 @@ except ImportError:
 class DataSynchronizer:
     def __init__(self, headless: bool = False):
         self.service = get_drive_service(headless)
+        self.failures: Dict[str, Dict[str, List[str]]] = {}
 
     def get_or_create_folder(self, folder_name: str, parent_id: Optional[str] = None) -> Optional[str]:
         """Finds or creates a folder on Google Drive."""
@@ -71,28 +72,64 @@ class DataSynchronizer:
                 logging.error(f"Error importing '{file_name}': {error}")
 
     def run_verification(self, data_path: str, book: str = None, chapter: str = None, verse: str = None, preprocessor: str = None) -> bool:
-        """Runs the external verification script."""
+        """Runs the external verification script and captures failures."""
         logging.info("="*50)
         logging.info("STARTING DATA VERIFICATION")
         logging.info("="*50)
         
         script_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'data-verification', 'verify_data.py'))
-        cmd = [sys.executable, script_path, '--data_folder', data_path]
+        cmd = [sys.executable, script_path, '--data_folder', data_path, '--json']
         if preprocessor: cmd.extend(['--preprocessor', preprocessor])
         elif verse: cmd.extend(['--book', book, '--chapter', chapter, '--verse', verse])
         elif chapter: cmd.extend(['--book', book, '--chapter', chapter])
         elif book: cmd.extend(['--book', book])
         
         try:
-            result = subprocess.run(cmd, check=False)
-            if result.returncode != 0:
-                logging.error("VERIFICATION FAILED. ABORTING SYNC.")
-                return False
-            logging.info("Data verification successful.\n")
-            return True
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            output = result.stdout
+            
+            # Extract JSON from output
+            if "---JSON_START---" in output:
+                try:
+                    json_str = output.split("---JSON_START---")[1].split("---JSON_END---")[0].strip()
+                    report = json.loads(json_str)
+                    self.failures = report.get("failures", {})
+                    if report.get("failed"):
+                        logging.warning("Verification found issues. Some items will be skipped during synchronization.")
+                    else:
+                        logging.info("Data verification successful.\n")
+                    return True # Continue with partial sync
+                except (IndexError, json.JSONDecodeError) as e:
+                    logging.error(f"Failed to parse verification report: {e}")
+                    return False
+            else:
+                if result.returncode != 0:
+                    logging.error(f"Verification failed without JSON output. Stderr: {result.stderr}")
+                    return False
+                logging.info("Data verification successful (no failures reported).\n")
+                return True
         except Exception as e:
             logging.error(f"Verification execution error: {e}")
             return False
+
+    def is_failed(self, book: str, chapter: str = None, verse: str = None) -> bool:
+        """Checks if a specific item failed verification."""
+        if book not in self.failures:
+            return False
+        
+        chapter_failures = self.failures[book]
+        if chapter is None:
+            return False 
+
+        if chapter not in chapter_failures:
+            return False
+            
+        verse_failures = chapter_failures[chapter]
+        if verse is None:
+            # If the chapter text itself is missing or failed (usually represented as an empty list or specific error)
+            return False
+            
+        return verse in verse_failures
 
     def sync_preprocessor(self, data_path: str, preprocessor_name: str, parent_id: str):
         """Synchronizes all tasks assigned to a specific preprocessor."""
@@ -126,6 +163,10 @@ class DataSynchronizer:
 
     def sync_verse(self, data_path: str, book: str, chapter: str, verse: str, parent_id: str):
         """Synchronizes a single verse."""
+        if self.is_failed(book, chapter, verse):
+            logging.warning(f"Skipping verse {verse} ({book}/{chapter}) due to verification failure.")
+            return
+
         logging.info(f"Syncing verse: {verse} ({book}/{chapter})")
         verse_id = self.get_or_create_folder(verse, parent_id)
         if not verse_id: return

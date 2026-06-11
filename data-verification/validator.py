@@ -8,41 +8,45 @@ except ImportError:
     from .utils import remove_punctuation, download_text_chapter_if_missing, get_verse_text
 
 def verify_verse(data_path, book, chapter, verse, language="ewondo"):
-    actual_text = get_verse_text(data_path, book, chapter, verse)
-    chapter_folder = os.path.join(data_path, book, chapter)
-    
-
-    if not os.path.isdir(chapter_folder):
-        raise ValueError(f"Chapter folder not found: {chapter_folder}")
-    
-    chapter_text_file_path = os.path.join(chapter_folder, f"{chapter}_{language}_original.txt")
-    if not os.path.exists(chapter_text_file_path):
-        chapter_text_file_path = download_text_chapter_if_missing(data_path, book, chapter, language)
+    try:
+        actual_text = get_verse_text(data_path, book, chapter, verse)
+        chapter_folder = os.path.join(data_path, book, chapter)
         
-    verse_num = verse.split('_')[-1]
-    expected_text = None
-    
-    with open(chapter_text_file_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            match = re.match(rf'^\[{verse_num}\]\s*(.*)', line.strip())
-            if match:
-                expected_text = match.group(1)
-                break
-                
-    if expected_text is None:
-        raise ValueError(f"Verse {verse_num} not found in {chapter_text_file_path}")
+        if not os.path.isdir(chapter_folder):
+            raise ValueError(f"Chapter folder not found: {chapter_folder}")
         
-    print(f"Actual text: '{actual_text}'")
-    print(f"Expected text: '{expected_text}'")
-    
-    actual_clean = remove_punctuation(actual_text) if actual_text else ""
-    expected_clean = remove_punctuation(expected_text)
-    
-    if actual_clean != expected_clean:
-        raise AssertionError(f"Expected '{expected_clean}', but got '{actual_clean}'")
-    
-    print(f"Verse {verse} verification passed!")
-    return True
+        chapter_text_file_path = os.path.join(chapter_folder, f"{chapter}_{language}_original.txt")
+        if not os.path.exists(chapter_text_file_path):
+            chapter_text_file_path = download_text_chapter_if_missing(data_path, book, chapter, language)
+            
+        verse_num = verse.split('_')[-1]
+        expected_text = None
+        
+        with open(chapter_text_file_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                match = re.match(rf'^\[{verse_num}\]\s*(.*)', line.strip())
+                if match:
+                    expected_text = match.group(1)
+                    break
+                    
+        if expected_text is None:
+            raise ValueError(f"Verse {verse_num} not found in {chapter_text_file_path}")
+            
+        logging.debug(f"Actual text: '{actual_text}'")
+        logging.debug(f"Expected text: '{expected_text}'")
+        
+        actual_clean = remove_punctuation(actual_text) if actual_text else ""
+        expected_clean = remove_punctuation(expected_text)
+        
+        if actual_clean != expected_clean:
+            raise AssertionError(f"Expected '{expected_clean}', but got '{actual_clean}'")
+        
+        print(f"Verse {verse} verification passed!")
+        return True
+    except Exception as e:
+        print(f"Verse {verse} verification failed: {e}")
+        logging.error(f"{book} {chapter} {verse} - {e}")
+        return False
 
 def verify_chapter(data_path, book, chapter, language="ewondo"):
     logging.info(f"Starting verification for {book} - {chapter}")
@@ -60,12 +64,7 @@ def verify_chapter(data_path, book, chapter, language="ewondo"):
     
     failed_verses = []
     for verse in verse_folders:
-        try:
-            verify_verse(data_path, book, chapter, verse, language)
-        except Exception as e:
-            error_msg = f"Verification failed for {verse}: {e}"
-            print(error_msg)
-            logging.error(f"{book} {chapter} {verse} - {e}")
+        if not verify_verse(data_path, book, chapter, verse, language):
             failed_verses.append(verse)
             
     if failed_verses:
