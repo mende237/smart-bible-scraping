@@ -133,7 +133,7 @@ python assigning_data_to_pre_pocessors.py --data_folder ../scraping/data/ewondo 
    - Choose **External** and fill in the required app information.
    - **Test Users (Crucial):** Scroll down to "Test users" and add **every Gmail address** (yours and your collaborators') that will use the script. 
      - *Note:* If an email is not added here, the user will get an **"Error 403: access_denied"** when trying to log in.
-   - **Note on Security Warning:** Since the app is not verified by Google, you will see a "Google hasn't verified this app" message during the first login. Click **Advanced** and then **Go to Smart-Transcribe (unsafe)** to proceed.
+   - **Note on Security Warning:** Since the app is not verified by Google, you will see a "Google hasn't verified this app" message during the first login. Click **Advanced** and then **Go to [Your Project Name] (unsafe)** to proceed.
 4. **Obtain Credentials:**
    - **For `client-secret.json` (Personal Quota - Recommended):**
      - Go to **APIs & Services > Credentials**.
