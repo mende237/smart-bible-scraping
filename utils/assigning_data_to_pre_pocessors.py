@@ -64,7 +64,7 @@ def assign_data_to_pre_processors(data_path, nbr_pre_processors):
 
     # print(assignment)    
     
-    with open(f'{data_path}/assignement.json', 'w', encoding='utf-8') as f:
+    with open(f'{data_path}/assignment.json', 'w', encoding='utf-8') as f:
         json.dump(assignment, f, indent=4)
 
 

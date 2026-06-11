@@ -6,8 +6,8 @@ A modular toolkit designed to scrape audio and text versions of the Bible from [
 
 - `scraping/`: Node.js tool powered by **Playwright** to automatically download text and audio versions of chapters.
 - `data-pre-processing/`: Python scripts to organize, clean, and map scraped data.
-- `data-verification/`: Python scripts to verify transcriptions against expected original text and log errors.
-- `data-synchronisation/`: Python scripts to sync local data with Google Drive.
+- `data-verification/`: Modular Python scripts to verify transcriptions against expected original text and log errors.
+- `data-synchronisation/`: A modular synchronization package to sync local data with Google Drive, including mandatory verification gates.
 - `utils/`: Helper scripts for data analysis and task distribution.
 
 ## 1. Scraping Module
@@ -73,13 +73,15 @@ python generate_utterance_file.py --data_folder ../scraping/data/ewondo
 ### Features
 - **Automated Verification**: Compares segmented audio transcriptions against the original scraped text to ensure accuracy.
 - **Auto-Recovery**: Automatically downloads and pre-processes missing reference text from Bible.com if it's not found in the local data folder.
+- **Modular Design**: Refactored into `validator.py` (core logic), `utils.py` (helpers), and `verify_data.py` (CLI entry point).
 - **Granular Control**: Supports verification at the verse, chapter, book, or preprocessor assignment level.
 - **Detailed Logging**: Logs all mismatches and missing files to `data-verification/logs/verification_errors.log`.
+- **Exit Codes**: Returns `0` on success and `1` on failure, allowing integration into automated workflows.
 
 ### Usage
 ```bash
 cd data-verification
-# Verify a specific preprocessor's workload (requires assignement.json)
+# Verify a specific preprocessor's workload (requires assignment.json)
 python verify_data.py --preprocessor pre_processor_1
 
 # Verify a specific book
@@ -96,7 +98,7 @@ python verify_data.py --book MAT --chapter MAT_1 --verse V_1
 
 ### Scripts
 - **`data_statistics.py`**: Analyzes the scraped data to generate `statistics.json`, containing metrics like total books, chapters, verses, and audio duration (mean, median, max, min) for each language.
-- **`assigning_data_to_pre_pocessors.py`**: Distributes the workload among a specified number of "pre-processors" by balancing the total audio duration assigned to each. It generates an `assignement.json` file.
+- **`assigning_data_to_pre_pocessors.py`**: Distributes the workload among a specified number of "pre-processors" by balancing the total audio duration assigned to each. It generates an `assignment.json` file.
 
 ### Usage
 ```bash
@@ -111,10 +113,12 @@ python assigning_data_to_pre_pocessors.py --data_folder ../scraping/data/ewondo 
 
 ### Features
 - **Cloud Backup**: Synchronizes local data with Google Drive to ensure work is safely backed up and accessible.
+- **Verification Gate**: **Mandatory automated verification** before synchronization. If verification fails, the sync is aborted to protect data integrity on the Cloud.
+- **Preprocessor Support**: Effortlessly synchronize an entire workload assigned to a specific preprocessor.
 - **Granular Sync**: Supports synchronization at the book, chapter, or verse level.
 - **Dual Authentication**: Supports both **Service Accounts** and **OAuth2 User Authentication** (recommended to use your personal storage quota).
 - **Headless Mode**: Special flag for authenticating on remote servers without browser access.
-- **Automatic Mirroring**: Automatically recreates the local folder structure on Google Drive.
+- **Modular Package**: Refactored into `config.py`, `auth.py`, `synchronizer.py`, and `synchronise_data.py`.
 
 ### Setup
 1. **Create a Google Cloud Project:**
@@ -150,6 +154,10 @@ python assigning_data_to_pre_pocessors.py --data_folder ../scraping/data/ewondo 
 ### Usage
 ```bash
 cd data-synchronisation
+
+# Synchronize a specific preprocessor's workload (Verify then Sync)
+python synchronise_data.py --preprocessor pre_processor_1
+
 # Synchronize a specific book
 python synchronise_data.py --book MAT
 
@@ -158,6 +166,9 @@ python synchronise_data.py --book MAT --chapter MAT_1
 
 # Synchronize a specific verse
 python synchronise_data.py --book MAT --chapter MAT_1 --verse V_1
+
+# Skip verification gate (Force Sync)
+python synchronise_data.py --book MAT --no-verify
 
 # Synchronize on a remote server (SSH)
 python synchronise_data.py --book MAT --headless
