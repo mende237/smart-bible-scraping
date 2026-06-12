@@ -10,6 +10,34 @@ A modular toolkit designed to scrape audio and text versions of the Bible from [
 - `data-synchronisation/`: A modular synchronization package to sync local data with Google Drive, including mandatory verification gates.
 - `utils/`: Helper scripts for data analysis and task distribution.
 
+## Prerequisites
+
+### System Tools
+- **Node.js** (v14 or higher)
+- **Python 3.10+** (v3.10 or higher recommended)
+- **FFmpeg**: Required for audio processing (handling `.mp3` to `.wav` conversions, etc.).
+- **wget**: Essential for downloading audio files via the scraping module.
+
+### Installation
+
+#### 1. Python Environment
+It is recommended to use a virtual environment:
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Linux/macOS
+# or
+.venv\Scripts\activate     # Windows
+
+pip install -r requirement.txt
+```
+
+#### 2. Scraping Module (Node.js)
+```bash
+cd scraping
+npm install
+npx playwright install chromium
+```
+
 ## 1. Scraping Module
 
 ### Features
@@ -19,21 +47,11 @@ A modular toolkit designed to scrape audio and text versions of the Bible from [
 - **Customizable Settings**: Extensive command-line arguments for dynamic scraping (`--language`, `--book`, `--chapter`, `--suffix`, `--text-only`, `--single-chapter`, `--download-folder`).
 - **Continuous Mode**: Optional "Download Until End" mode to scrape entire books automatically.
 
-### Prerequisites
-- [Node.js](https://nodejs.org/) (v14 or higher)
-- `wget` installed on your system (used for audio downloads)
-
 ### Usage
-1. Navigate to the scraping directory and install dependencies:
-   ```bash
-   cd scraping
-   npm install
-   npx playwright install chromium
-   ```
-2. Start the scraper:
+1. Start the scraper:
    ```bash
    node src/scrapping.js
-
+   ```
    # You can also specify custom parameters:
    node src/scrapping.js --suffix original
    
