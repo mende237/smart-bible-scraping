@@ -4,22 +4,24 @@ import logging
 import sys
 import json
 
+# Add the project root to sys.path to allow importing utils
+project_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
 # Add the current directory to sys.path to allow relative-like imports if needed
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from utils.logging_config import setup_logging
 
 try:
     from validator import verify_verse, verify_chapter, verify_book, verify_preprocessor
 except ImportError:
     from .validator import verify_verse, verify_chapter, verify_book, verify_preprocessor
 
-# Configure logging to output to a file in the data-verification folder
+# Configure logging
 log_file_path = os.path.join(os.path.dirname(__file__), 'logs', 'verification_errors.log')
-os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
-logging.basicConfig(
-    filename=log_file_path,
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+setup_logging(log_file=log_file_path)
 
 LANGUAGE = "ewondo"
 

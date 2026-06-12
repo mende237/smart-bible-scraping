@@ -3,9 +3,9 @@ import re
 import logging
 import json
 try:
-    from utils import remove_punctuation, download_text_chapter_if_missing, get_verse_text
+    from validator_utils import remove_punctuation, download_text_chapter_if_missing, get_verse_text
 except ImportError:
-    from .utils import remove_punctuation, download_text_chapter_if_missing, get_verse_text
+    from .validator_utils import remove_punctuation, download_text_chapter_if_missing, get_verse_text
 
 def verify_verse(data_path, book, chapter, verse, language="ewondo"):
     try:

@@ -3,8 +3,15 @@ import argparse
 import logging
 import sys
 
+# Add the project root to sys.path to allow importing utils
+project_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
 # Add the current directory to sys.path to allow relative-like imports if needed
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from utils.logging_config import setup_logging
 
 try:
     from synchronizer import DataSynchronizer
@@ -13,7 +20,7 @@ except ImportError:
     from .synchronizer import DataSynchronizer
     from .config import PARENT_FOLDER_ID, BASE_DIR
 
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+setup_logging()
 
 def main():
     parser = argparse.ArgumentParser(description='Synchronizes local data with Google Drive.')
