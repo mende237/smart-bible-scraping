@@ -52,15 +52,17 @@ npx playwright install chromium
    ```bash
    node src/scrapping.js
    ```
-   # You can also specify custom parameters:
-   node src/scrapping.js --suffix original
-   
-   # Example: Download only the text for chapter 1 of Mark in Ewondo:
-   node src/scrapping.js --language ewondo --book MRK --chapter 1 --text-only --single-chapter --suffix original
+2. You can also specify custom parameters:
 
-   # Example: Download to a custom folder:
-   node src/scrapping.js --download-folder /path/to/custom/folder
-   ```
+   ```node src/scrapping.js --suffix original```
+   
+3. Example: Download only the text for chapter 1 of Mark in Ewondo:
+
+   ```node src/scrapping.js --language ewondo --book MRK --chapter 1 --text-only --single-chapter --suffix original```
+
+4. Example: Download to a custom folder:
+
+   ```node src/scrapping.js --download-folder /path/to/custom/folder```
 
 ## 2. Data Pre-processing Module
 
