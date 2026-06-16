@@ -48,21 +48,19 @@ npx playwright install chromium
 - **Continuous Mode**: Optional "Download Until End" mode to scrape entire books automatically.
 
 ### Usage
-1. Start the scraper:
    ```bash
+   # Start the scraper:
    node src/scrapping.js
-   ```
-2. You can also specify custom parameters:
 
-   ```node src/scrapping.js --suffix original```
+   # You can also specify custom parameters:
+   node src/scrapping.js --suffix original
    
-3. Example: Download only the text for chapter 1 of Mark in Ewondo:
+   # Example: Download only the text for chapter 1 of Mark in Ewondo:
+   node src/scrapping.js --language ewondo --book MRK --chapter 1 --text-only --single-chapter --suffix original
 
-   ```node src/scrapping.js --language ewondo --book MRK --chapter 1 --text-only --single-chapter --suffix original```
-
-4. Example: Download to a custom folder:
-
-   ```node src/scrapping.js --download-folder /path/to/custom/folder```
+   # Example: Download to a custom folder:
+   node src/scrapping.js --download-folder /path/to/custom/folder
+   ```
 
 ## 2. Data Pre-processing Module
 
