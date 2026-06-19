@@ -3,9 +3,9 @@ import re
 import logging
 import json
 try:
-    from validator_utils import remove_punctuation, download_text_chapter_if_missing, get_verse_text
+    from validator_utils import remove_punctuation, remove_extra_spaces, download_text_chapter_if_missing, get_verse_text
 except ImportError:
-    from .validator_utils import remove_punctuation, download_text_chapter_if_missing, get_verse_text
+    from .validator_utils import remove_punctuation, remove_extra_spaces, download_text_chapter_if_missing, get_verse_text
 
 def verify_verse(data_path, book, chapter, verse, language="ewondo"):
     try:
@@ -35,8 +35,8 @@ def verify_verse(data_path, book, chapter, verse, language="ewondo"):
         logging.debug(f"Actual text: '{actual_text}'")
         logging.debug(f"Expected text: '{expected_text}'")
         
-        actual_clean = remove_punctuation(actual_text) if actual_text else ""
-        expected_clean = remove_punctuation(expected_text)
+        actual_clean = remove_extra_spaces(remove_punctuation(actual_text)) if actual_text else ""
+        expected_clean = remove_extra_spaces(remove_punctuation(expected_text))
         
         if actual_clean != expected_clean:
             raise AssertionError(f"Expected '{expected_clean}', but got '{actual_clean}'")

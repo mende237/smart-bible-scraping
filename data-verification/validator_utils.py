@@ -8,6 +8,9 @@ def remove_punctuation(text):
     cleaned_text = re.sub(punctuation_pattern, '', text)
     return cleaned_text.strip().lower()
 
+def remove_extra_spaces(text):
+    return re.sub(r'\s+', ' ', text).strip()
+
 
 def download_text_chapter_if_missing(data_path, book, chapter, language="ewondo"):
     chapter_folder = os.path.join(data_path, book, chapter)
@@ -79,7 +82,7 @@ def get_verse_text(data_path, book, chapter, verse):
             texts = []
             for num in utt_numbers:
                 with open(os.path.join(verse_folder, utt_files[num]), 'r') as f:
-                    texts.append(f.read().strip())
+                    texts.append(remove_punctuation(f.read()).strip())
                     
             return " ".join(texts)
     return None
