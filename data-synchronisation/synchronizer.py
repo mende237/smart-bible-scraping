@@ -43,33 +43,66 @@ class DataSynchronizer:
             logging.error(f"Error managing folder '{folder_name}': {error}")
             return None
 
-    def upload_file(self, local_path: str, parent_id: str):
-        """Uploads or updates a file on Google Drive."""
-        file_name = os.path.basename(local_path)
+    def get_file_id(self, file_name: str, parent_id: str) -> Optional[str]:
+        """Finds a file ID on Google Drive by name and parent ID."""
         query = f"name = '{file_name}' and '{parent_id}' in parents and trashed = false"
-        
         try:
             results = self.service.files().list(
                 q=query, fields="files(id, name)", supportsAllDrives=True, includeItemsFromAllDrives=True
             ).execute()
             items = results.get('files', [])
-            
+            return items[0]['id'] if items else None
+        except HttpError as error:
+            logging.error(f"Error checking file existence for '{file_name}': {error}")
+            return None
+
+    def create_file(self, local_path: str, parent_id: str, media: MediaFileUpload) -> Optional[str]:
+        """Creates a new file on Google Drive."""
+        file_name = os.path.basename(local_path)
+        file_metadata = {'name': file_name, 'parents': [parent_id]}
+        try:
+            file = self.service.files().create(
+                body=file_metadata, media_body=media, fields='id', supportsAllDrives=True
+            ).execute()
+            logging.info(f"File imported: {file_name}")
+            return file.get('id')
+        except HttpError as error:
+            self._handle_upload_error(file_name, error)
+            return None
+
+    def update_file(self, local_path: str, file_id: str, media: MediaFileUpload):
+        """Updates an existing file on Google Drive."""
+        file_name = os.path.basename(local_path)
+        try:
+            self.service.files().update(
+                fileId=file_id, media_body=media, supportsAllDrives=True
+            ).execute()
+            logging.info(f"File updated: {file_name}")
+        except HttpError as error:
+            self._handle_upload_error(file_name, error)
+
+    def _handle_upload_error(self, file_name: str, error: HttpError):
+        """Helper to handle HTTP errors during upload/update operations."""
+        if error.resp.status == 403 and "storageQuotaExceeded" in str(error):
+            logging.error("Storage quota exceeded. Consider switching to OAuth2.")
+        else:
+            logging.error(f"Error importing/updating '{file_name}': {error}")
+
+    def upload_file(self, local_path: str, parent_id: str):
+        """Uploads or updates a file on Google Drive."""
+        file_name = os.path.basename(local_path)
+        file_id = self.get_file_id(file_name, parent_id)
+        
+        try:
             mime_type, _ = mimetypes.guess_type(local_path)
             media = MediaFileUpload(local_path, mimetype=mime_type or 'application/octet-stream')
             
-            if items:
-                file_id = items[0]['id']
-                self.service.files().update(fileId=file_id, media_body=media, supportsAllDrives=True).execute()
-                logging.info(f"File updated: {file_name}")
+            if file_id:
+                self.update_file(local_path, file_id, media)
             else:
-                file_metadata = {'name': file_name, 'parents': [parent_id]}
-                self.service.files().create(body=file_metadata, media_body=media, fields='id', supportsAllDrives=True).execute()
-                logging.info(f"File imported: {file_name}")
-        except HttpError as error:
-            if error.resp.status == 403 and "storageQuotaExceeded" in str(error):
-                logging.error("Storage quota exceeded. Consider switching to OAuth2.")
-            else:
-                logging.error(f"Error importing '{file_name}': {error}")
+                self.create_file(local_path, parent_id, media)
+        except Exception as e:
+            logging.error(f"Failed to prepare media upload for '{file_name}': {e}")
 
     def run_verification(self, data_path: str, book: str = None, chapter: str = None, verse: str = None, preprocessor: str = None) -> bool:
         """Runs the external verification script and captures failures."""
@@ -214,3 +247,155 @@ class DataSynchronizer:
             chapter_path = os.path.join(book_local_path, chapter)
             if os.path.isdir(chapter_path) and chapter.startswith(f"{book}_"):
                 self.sync_chapter(data_path, book, chapter, book_id)
+
+    def get_folder_id(self, folder_name: str, parent_id: Optional[str] = None) -> Optional[str]:
+        """Finds a folder on Google Drive without creating it."""
+        query = f"name = '{folder_name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+        if parent_id:
+            query += f" and '{parent_id}' in parents"
+        
+        try:
+            results = self.service.files().list(
+                q=query, fields="files(id, name)", supportsAllDrives=True, includeItemsFromAllDrives=True
+            ).execute()
+            items = results.get('files', [])
+            if items:
+                return items[0]['id']
+            return None
+        except HttpError as error:
+            logging.error(f"Error finding folder '{folder_name}': {error}")
+            return None
+
+    def list_folder_contents(self, folder_id: str) -> List[Dict]:
+        """Lists all files and folders inside a given Google Drive folder."""
+        query = f"'{folder_id}' in parents and trashed = false"
+        try:
+            results = self.service.files().list(
+                q=query, fields="files(id, name, mimeType)", supportsAllDrives=True, includeItemsFromAllDrives=True
+            ).execute()
+            return results.get('files', [])
+        except HttpError as error:
+            logging.error(f"Error listing folder contents: {error}")
+            return []
+
+    def download_file(self, file_id: str, local_path: str):
+        """Downloads a file from Google Drive."""
+        from googleapiclient.http import MediaIoBaseDownload
+        import io
+        
+        file_name = os.path.basename(local_path)
+        try:
+            os.makedirs(os.path.dirname(local_path), exist_ok=True)
+            request = self.service.files().get_media(fileId=file_id)
+            with io.FileIO(local_path, 'wb') as fh:
+                downloader = MediaIoBaseDownload(fh, request)
+                done = False
+                while done is False:
+                    status, done = downloader.next_chunk()
+            logging.info(f"File downloaded: {file_name}")
+        except HttpError as error:
+            logging.error(f"Error downloading '{file_name}': {error}")
+
+    def download_verse(self, local_data_path: str, book: str, chapter: str, verse: str, parent_id: str):
+        """Downloads files for a single verse from Google Drive."""
+        logging.info(f"Downloading verse: {verse} ({book}/{chapter})")
+        verse_id = self.get_folder_id(verse, parent_id)
+        if not verse_id:
+            logging.warning(f"Verse folder '{verse}' not found on Google Drive under parent {parent_id}.")
+            return
+
+        verse_local_path = os.path.join(local_data_path, book, chapter, verse)
+        os.makedirs(verse_local_path, exist_ok=True)
+
+        items = self.list_folder_contents(verse_id)
+        for item in items:
+            if item['mimeType'] != 'application/vnd.google-apps.folder':
+                local_file_path = os.path.join(verse_local_path, item['name'])
+                self.download_file(item['id'], local_file_path)
+
+    def download_chapter(self, local_data_path: str, book: str, chapter: str, parent_id: str):
+        """Downloads a single chapter."""
+        logging.info(f"Downloading chapter: {chapter} ({book})")
+        chapter_id = self.get_folder_id(chapter, parent_id)
+        if not chapter_id:
+            logging.warning(f"Chapter folder '{chapter}' not found on Google Drive.")
+            return
+
+        chapter_local_path = os.path.join(local_data_path, book, chapter)
+        os.makedirs(chapter_local_path, exist_ok=True)
+
+        items = self.list_folder_contents(chapter_id)
+        for item in items:
+            if item['mimeType'] == 'application/vnd.google-apps.folder':
+                if item['name'].startswith('V_'):
+                    self.download_verse(local_data_path, book, chapter, item['name'], chapter_id)
+            else:
+                local_file_path = os.path.join(chapter_local_path, item['name'])
+                self.download_file(item['id'], local_file_path)
+
+    def download_book(self, local_data_path: str, book: str, parent_id: str):
+        """Downloads an entire book."""
+        logging.info(f"Downloading book: {book}")
+        book_id = self.get_folder_id(book, parent_id)
+        if not book_id:
+            logging.warning(f"Book folder '{book}' not found on Google Drive.")
+            return
+
+        book_local_path = os.path.join(local_data_path, book)
+        os.makedirs(book_local_path, exist_ok=True)
+
+        items = self.list_folder_contents(book_id)
+        for item in items:
+            if item['mimeType'] == 'application/vnd.google-apps.folder':
+                if item['name'].startswith(f"{book}_"):
+                    self.download_chapter(local_data_path, book, item['name'], book_id)
+            else:
+                local_file_path = os.path.join(book_local_path, item['name'])
+                self.download_file(item['id'], local_file_path)
+
+    def download_preprocessor(self, local_data_path: str, preprocessor_name: str, parent_id: str):
+        """Downloads all tasks assigned to a specific preprocessor."""
+        assignment_file = os.path.join(local_data_path, "assignment.json")
+        
+        if not os.path.exists(assignment_file):
+            logging.info("Assignment file not found locally. Searching on Google Drive...")
+            assignment_query = f"name = 'assignment.json' and '{parent_id}' in parents and trashed = false"
+            try:
+                results = self.service.files().list(
+                    q=assignment_query, fields="files(id, name)", supportsAllDrives=True, includeItemsFromAllDrives=True
+                ).execute()
+                items = results.get('files', [])
+                if items:
+                    os.makedirs(local_data_path, exist_ok=True)
+                    self.download_file(items[0]['id'], assignment_file)
+                    logging.info("Successfully downloaded assignment.json from Google Drive.")
+                else:
+                    logging.error("assignment.json not found on Google Drive. Cannot sync preprocessor tasks.")
+                    return
+            except HttpError as error:
+                logging.error(f"Error looking up assignment.json on Google Drive: {error}")
+                return
+
+        with open(assignment_file, 'r', encoding='utf-8') as f:
+            assignments = json.load(f)
+            
+        if preprocessor_name not in assignments:
+            logging.error(f"Preprocessor '{preprocessor_name}' not found in assignment file.")
+            return
+            
+        preprocessor_tasks = assignments[preprocessor_name]
+        logging.info(f"Downloading all tasks for preprocessor: {preprocessor_name}")
+
+        for book, chapters in preprocessor_tasks.items():
+            if book == "total_duration_hours":
+                continue
+                
+            if chapters == "all":
+                self.download_book(local_data_path, book, parent_id)
+            else:
+                book_id = self.get_folder_id(book, parent_id)
+                if not book_id:
+                    logging.warning(f"Book folder '{book}' not found on Google Drive.")
+                    continue
+                for chapter in chapters:
+                    self.download_chapter(local_data_path, book, chapter, book_id)
