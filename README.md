@@ -7,7 +7,7 @@ A modular toolkit designed to scrape audio and text versions of the Bible from [
 - `scraping/`: Node.js tool powered by **Playwright** to automatically download text and audio versions of chapters.
 - `data-pre-processing/`: Python scripts to organize, clean, and map scraped data.
 - `data-verification/`: Modular Python scripts to verify transcriptions against expected original text and log errors.
-- `data-synchronisation/`: A modular synchronization package to sync local data with Google Drive, including mandatory verification gates.
+- `data-synchronisation/`: A modular synchronization package to sync local data with Google Drive, supporting upload, download, and mandatory verification gates.
 - `utils/`: Helper scripts for data analysis and task distribution.
 
 ## Prerequisites
@@ -61,6 +61,18 @@ npx playwright install chromium
    # Example: Download to a custom folder:
    node src/scrapping.js --download-folder /path/to/custom/folder
    ```
+
+### CLI Options Reference
+
+| Argument | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `--language` | `str` | `french` | Language identifier (e.g., `french`, `ewondo`). <br>**Note on adding languages:** If you want to add support for a new language, you must visit [Bible.com](https://www.bible.com) to find the correct Bible version code (e.g. `NTE12`) and numeric version ID (e.g. `1854`), and add them to the version mappings inside [scrapping.js](scraping/src/scrapping.js#L39-L55). |
+| `--book` | `str` | `MAT` | USFM book code to scrape (e.g., `MAT`, `MRK`, `LUK`, `JHN`). |
+| `--chapter` | `int` | `1` | Starting chapter number. |
+| `--suffix` | `str` | `""` | Optional suffix to append to the filename (e.g. `original`). |
+| `--text-only` | `flag` | *None* | Disables downloading the audio file, fetching only the text transcription. |
+| `--single-chapter` | `flag` | *None* | Restricts downloading to only the starting chapter rather than continuing until the end of the book. |
+| `--download-folder` | `str` | `../data/<language>` | Path to the directory where scraped files will be saved. |
 
 ## 2. Data Pre-processing Module
 
@@ -153,11 +165,11 @@ python assigning_data_to_pre_pocessors.py --data_folder ../scraping/data/ewondo 
 ## 5. Data Synchronisation Module
 
 ### Features
-- **Cloud Backup**: Synchronizes local data with Google Drive to ensure work is safely backed up and accessible.
+- **Bidirectional Sync / Cloud Backup**: Synchronizes local data with Google Drive. Supports both uploading local work to Drive and downloading data from Drive to local folders.
 - **Verification Gate**: Automated verification before synchronization.
 - **Partial Sync**: **Smart synchronization logic** that skips individual verses that fail verification while still uploading those that pass.
-- **Preprocessor Support**: Effortlessly synchronize an entire workload assigned to a specific preprocessor.
-- **Granular Sync**: Supports synchronization at the book, chapter, or verse level.
+- **Preprocessor Support**: Effortlessly synchronize or download an entire workload assigned to a specific preprocessor.
+- **Granular Sync / Download**: Supports operations at the book, chapter, or verse level.
 - **Dual Authentication**: Supports both **Service Accounts** and **OAuth2 User Authentication** (recommended to use your personal storage quota).
 - **Headless Mode**: Special flag for authenticating on remote servers without browser access.
 - **Modular Package**: Refactored into `config.py`, `auth.py`, `synchronizer.py`, and `synchronise_data.py`.
@@ -193,6 +205,20 @@ python assigning_data_to_pre_pocessors.py --data_folder ../scraping/data/ewondo 
      ```
    - **Sharing:** Ensure the target Google Drive folder is **shared** with the email address of the Service Account (if used) or that your personal account has "Editor" access to it.
 
+### Language Folder Mapping & Directory Structure
+
+> [!IMPORTANT]
+> Before launching the script to **download**, ensure that the last segment of the `--data_folder` path value matches exactly with the folder hosting your data on Google Drive. If they do not match, the execution will abort with:
+>
+> `Language folder '{last segment}' not found on Google Drive.`
+>
+> For example, in the illustration image below:
+> - The parent folder on Google Drive is named `segmented-data` (whose folder ID is configured in your `.env` file under `DRIVE_FOLDER_ID`).
+> - Directly inside this folder, the language data is hosted in a sub-folder named `ewondo`.
+> - Therefore, if you want to download this language data, the last part of your `--data_folder` argument must be `ewondo` (e.g., `--data_folder ../scraping/data/ewondo`).
+>
+> ![Google Drive Directory Structure](screenshot/drive-data-root.png)
+
 ### Usage
 ```bash
 cd data-synchronisation
@@ -200,14 +226,26 @@ cd data-synchronisation
 # Synchronize a specific preprocessor's workload (Verify then Sync)
 python synchronise_data.py --preprocessor pre_processor_1
 
+# Download a specific preprocessor's workload from Google Drive
+python synchronise_data.py --preprocessor pre_processor_1 --download
+
 # Synchronize a specific book
 python synchronise_data.py --book MAT
+
+# Download a specific book from Google Drive to local folder
+python synchronise_data.py --book MAT --download
 
 # Synchronize a specific chapter
 python synchronise_data.py --book MAT --chapter MAT_1
 
+# Download a specific chapter from Google Drive
+python synchronise_data.py --book MAT --chapter MAT_1 --download
+
 # Synchronize a specific verse
 python synchronise_data.py --book MAT --chapter MAT_1 --verse V_1
+
+# Download a specific verse from Google Drive
+python synchronise_data.py --book MAT --chapter MAT_1 --verse V_1 --download
 
 # Skip verification gate (Force Sync)
 python synchronise_data.py --book MAT --no-verify
@@ -241,7 +279,7 @@ The table below shows which standard and unique parameters are supported by each
 | **[generate_verses_folder.py](data-pre-processing/generate_verses_folder.py)** | `--data_folder` | *None* |
 | **[generate_utterance_file.py](data-pre-processing/generate_utterance_file.py)** | `--data_folder` | *None* |
 | **[verify_data.py](data-verification/verify_data.py)** | All common arguments | `--json`: Output verification errors as a JSON block. |
-| **[synchronise_data.py](data-synchronisation/synchronise_data.py)** | All common arguments | `--headless`: SSH/console-mode authentication.<br>`--no-verify`: Skip verification gate before synchronization. |
+| **[synchronise_data.py](data-synchronisation/synchronise_data.py)** | All common arguments | `--headless`: SSH/console-mode authentication.<br>`--no-verify`: Skip verification gate before synchronization.<br>`--download`: Download from Google Drive instead of uploading. |
 | **[data_statistics.py](utils/data_statistics.py)** | `--data_folder`, `--book`, `--chapter`, `--preprocessor` | `--books`: space-separated list of books to compile metrics (mutually exclusive with `--book` and `--preprocessor`). |
 | **[assigning_data_to_pre_pocessors.py](utils/assigning_data_to_pre_pocessors.py)**| `--data_folder` | `--nbr_pre_processors` (default `5`): Total partitions. |
 
@@ -269,3 +307,8 @@ scraping/data/
 - **Timeout Error**: Might be due to slow page loads or cookie consent popups.
 - **Selector Changes**: The scraper depends on Bible.com's CSS classes. If the site layout changes, update selectors in `src/scrapping.js` or `src/textDownloader.js`.
 - **wget not found**: Ensure `wget` is available in your PATH.
+- **OAuth 2.0 Access Denied (Error 403: access_denied)**: Make sure the Gmail address you are authenticating with is added to the "Test users" list in your Google Cloud Project's OAuth consent screen config.
+- **Google hasn't verified this app warning**: This is normal for unverified development apps. Click **Advanced** and then **Go to [Project Name] (unsafe)** to bypass.
+- **Storage Quota Exceeded (Error 403: storageQuotaExceeded)**: Service accounts have a very limited shared storage. Configure and use OAuth2 with `client-secret.json` to utilize your personal account's Google Drive storage instead.
+- **Drive Folder ID Not Found or Access Error**: Ensure that `DRIVE_FOLDER_ID` is set correctly in your `.env` file, and that the target Google Drive folder is shared with the account executing the script (e.g. Editor permission).
+- **Verification Failures During Upload**: If synchronization is blocked because of local text validation failures, you can bypass the checks using the `--no-verify` flag.
