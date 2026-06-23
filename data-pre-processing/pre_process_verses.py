@@ -1,6 +1,14 @@
 import os
 import re
 import argparse
+import sys
+
+# Add project root to sys.path to allow importing utils
+project_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+from utils.cli_args import create_base_parser, add_granularity_arguments
 
 def pre_processing_verses_chapter(data_folder, book, chapter):
     chapter_path = os.path.join(data_folder, book, chapter)
@@ -43,25 +51,8 @@ def pre_processing_verses(data_folder):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Pre-process scraped Bible text files.')
-    parser.add_argument(
-        '--data_folder',
-        type=str,
-        default='../scraping/data/ewondo',
-        help='Path to the data folder containing the scraped files.'
-    )
-    parser.add_argument(
-        '--book',
-        type=str,
-        default=None,
-        help='Specific book to process (e.g., MAT).'
-    )
-    parser.add_argument(
-        '--chapter',
-        type=str,
-        default=None,
-        help='Specific chapter to process (e.g., MAT_1).'
-    )
+    parser = create_base_parser('Pre-process scraped Bible text files.')
+    add_granularity_arguments(parser)
     args = parser.parse_args()
     
     if args.book and args.chapter:

@@ -4,6 +4,13 @@ import sys
 from pathlib import Path
 import argparse
 
+# Add project root to sys.path to allow importing utils
+project_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+from utils.cli_args import create_base_parser
+
 
 try:
     from watchdog.observers import Observer
@@ -70,12 +77,6 @@ def monitor(path_to_watch):
     print("Monitor stopped.")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Monitor a directory for new .wav files and create corresponding .txt files.')
-    parser.add_argument(
-        '--data_folder',
-        type=str,
-        default='../scraping/data/ewondo',
-        help='Path to the data folder containing the scraped files.'
-    )
+    parser = create_base_parser('Monitor a directory for new .wav files and create corresponding .txt files.')
     args = parser.parse_args()
     monitor(args.data_folder)

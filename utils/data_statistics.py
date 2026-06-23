@@ -4,6 +4,11 @@ import statistics
 import json
 from pydub import AudioSegment
 
+try:
+    from cli_args import create_base_parser
+except ImportError:
+    from utils.cli_args import create_base_parser
+
 
 def get_statictics(data_folder):
     stats = {}
@@ -272,13 +277,7 @@ def get_segmented_preprocessor_data_statistics(data_folder, preprocessor_name, d
     
     
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Extract statistics from scraped Bible audio and text files.')
-    parser.add_argument(
-        '--data_folder',
-        type=str,
-        default='../scraping/data/ewondo',
-        help='Path to the data folder containing the scraped files.'
-    )
+    parser = create_base_parser('Extract statistics from scraped Bible audio and text files.')
 
     # Group for mutually exclusive book arguments
     selection_group = parser.add_mutually_exclusive_group()

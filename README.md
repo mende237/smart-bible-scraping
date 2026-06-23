@@ -115,14 +115,37 @@ python verify_data.py --book MAT --chapter MAT_1 --verse V_1
 ## 4. Utilities Module
 
 ### Scripts
-- **`data_statistics.py`**: Analyzes the scraped data to generate `statistics.json`, containing metrics like total books, chapters, verses, and audio duration (mean, median, max, min) for each language.
-- **`assigning_data_to_pre_pocessors.py`**: Distributes the workload among a specified number of "pre-processors" by balancing the total audio duration assigned to each. It generates an `assignment.json` file.
+- **[data_statistics.py](utils/data_statistics.py)**: Analyzes scraped and processed dataset files to generate comprehensive statistics. It supports multiple modes of operations:
+  - **Global Dataset Statistics**: Calls [get_statictics](utils/data_statistics.py#L8) to extract metrics (number of books, chapters, verses, and audio duration statistics) from raw scraped files, saving them to `{data_folder}/statistics.json`.
+  - **Segmented Chapter Statistics**: Calls [get_segmented_chapter_statistics](utils/data_statistics.py#L82) to analyze segmented `.wav` files inside a specific chapter folder and generate `{chapter}_statistics.json`.
+  - **Segmented Book Statistics**: Calls [get_segmented_book_statistics](utils/data_statistics.py#L131) to compile segment statistics for all chapters of a book, saving them to `{book}_statistics.json`.
+  - **Segmented Books Statistics**: Calls [get_segmented_books_statistics](utils/data_statistics.py#L170) to compile segment statistics for a custom list of books, saving them to `{books_list}_statistics.json`.
+  - **Preprocessor Workload Statistics**: Calls [get_segmented_preprocessor_data_statistics](utils/data_statistics.py#L213) to read `assignment.json` and generate workload statistics for a specific preprocessor, saving them to `{preprocessor_name}_statistics.json`.
+- **[assigning_data_to_pre_pocessors.py](utils/assigning_data_to_pre_pocessors.py)**: Distributes the workload among a specified number of "pre-processors" by balancing the total audio duration assigned to each. It generates an `assignment.json` file.
+
+
+*For a complete reference of the CLI parameters supported by this script and others, see the [Shared CLI Arguments Reference](#6-shared-cli-arguments-reference) section.*
+
 
 ### Usage
 ```bash
 cd utils
-# Generate data statistics
+
+# Generate global statistics for the entire dataset (default raw scraper statistics)
 python data_statistics.py --data_folder ../scraping/data/ewondo
+
+# Generate statistics for a specific book (e.g., MAT)
+python data_statistics.py --data_folder ../scraping/data/ewondo --book MAT
+
+# Generate statistics for a specific chapter (e.g., MAT_1)
+python data_statistics.py --data_folder ../scraping/data/ewondo --book MAT --chapter MAT_1
+
+# Generate statistics for multiple books (e.g., MAT and LUK)
+python data_statistics.py --data_folder ../scraping/data/ewondo --books MAT LUK
+
+# Generate statistics for a specific preprocessor workload
+python data_statistics.py --data_folder ../scraping/data/ewondo --preprocessor pre_processor_1
+
 # Assign data to 5 pre-processors
 python assigning_data_to_pre_pocessors.py --data_folder ../scraping/data/ewondo --nbr_pre_processors 5
 ```
@@ -192,6 +215,35 @@ python synchronise_data.py --book MAT --no-verify
 # Synchronize on a remote server (SSH)
 python synchronise_data.py --book MAT --headless
 ```
+
+## 6. Shared CLI Arguments Reference
+
+To maintain a consistent interface and avoid redundancy, all Python scripts in this toolkit leverage a shared argument parser defined in [utils/cli_args.py](utils/cli_args.py).
+
+### Common Arguments
+All scripts support the `--data_folder` argument, and specific scripts extend this to include granular data targeting options:
+
+| Argument | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `--data_folder` | `str` | `../scraping/data/ewondo` | Path to the local data directory. |
+| `--book` | `str` | `None` | Target a specific book (e.g., `MAT`). |
+| `--chapter` | `str` | `None` | Target a specific chapter (e.g., `MAT_1`). Requires `--book`. |
+| `--verse` | `str` | `None` | Target a specific verse folder (e.g., `V_1`). |
+| `--preprocessor`| `str` | `None` | Target a specific preprocessor workload assignment. |
+
+### Script-Specific Parameter Matrix
+
+The table below shows which standard and unique parameters are supported by each script:
+
+| Script | Common Params Supported | Unique Parameters |
+| :--- | :--- | :--- |
+| **[pre_process_verses.py](data-pre-processing/pre_process_verses.py)** | `--data_folder`, `--book`, `--chapter` | *None* |
+| **[generate_verses_folder.py](data-pre-processing/generate_verses_folder.py)** | `--data_folder` | *None* |
+| **[generate_utterance_file.py](data-pre-processing/generate_utterance_file.py)** | `--data_folder` | *None* |
+| **[verify_data.py](data-verification/verify_data.py)** | All common arguments | `--json`: Output verification errors as a JSON block. |
+| **[synchronise_data.py](data-synchronisation/synchronise_data.py)** | All common arguments | `--headless`: SSH/console-mode authentication.<br>`--no-verify`: Skip verification gate before synchronization. |
+| **[data_statistics.py](utils/data_statistics.py)** | `--data_folder`, `--book`, `--chapter`, `--preprocessor` | `--books`: space-separated list of books to compile metrics (mutually exclusive with `--book` and `--preprocessor`). |
+| **[assigning_data_to_pre_pocessors.py](utils/assigning_data_to_pre_pocessors.py)**| `--data_folder` | `--nbr_pre_processors` (default `5`): Total partitions. |
 
 ## Folder Structure After Processing
 ```

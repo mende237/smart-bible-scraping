@@ -5,6 +5,11 @@ from data_statistics import get_statictics
 from pydub import AudioSegment
 import argparse
 
+try:
+    from cli_args import create_base_parser
+except ImportError:
+    from utils.cli_args import create_base_parser
+
 
 def assign_data_to_pre_processors(data_path, nbr_pre_processors):
     if not os.path.exists(os.path.join(data_path, "statistics.json")):
@@ -70,13 +75,7 @@ def assign_data_to_pre_processors(data_path, nbr_pre_processors):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Assign data to pre-processors based on total duration.')
-    parser.add_argument(
-        '--data_folder',
-        type=str,
-        default='../scraping/data/ewondo',        
-        help='Path to the data folder containing the scraped files.'
-    )
+    parser = create_base_parser('Assign data to pre-processors based on total duration.')
     parser.add_argument(
         '--nbr_pre_processors',
         type=int,

@@ -12,6 +12,8 @@ if project_root not in sys.path:
 # Add the current directory to sys.path to allow relative-like imports if needed
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+from utils.cli_args import create_base_parser, add_granularity_arguments
+
 from utils.logging_config import setup_logging
 
 try:
@@ -26,37 +28,8 @@ setup_logging(log_file=log_file_path)
 LANGUAGE = "ewondo"
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Verify verse transcriptions against the expected text.')
-    parser.add_argument(
-        '--data_folder',
-        type=str,
-        default='../scraping/data/ewondo',
-        help='Path to the data folder containing the scraped files.'
-    )
-    parser.add_argument(
-        '--book',
-        type=str,
-        default=None,
-        help='Specific book to process (e.g., LUK).'
-    )
-    parser.add_argument(
-        '--chapter',
-        type=str,
-        default=None,
-        help='Specific chapter to process (e.g., LUK_1).'
-    )
-    parser.add_argument(
-        '--verse',
-        type=str,
-        default=None,
-        help='Specific verse to process (e.g., V_1).'
-    )
-    parser.add_argument(
-        '--preprocessor',
-        type=str,
-        default=None,
-        help='Specific preprocessor to verify (e.g., pre_processor_1). Requires assignment.json in data folder.'
-    )
+    parser = create_base_parser('Verify verse transcriptions against the expected text.')
+    add_granularity_arguments(parser, include_verse=True, include_preprocessor=True)
     parser.add_argument(
         '--json',
         action='store_true',

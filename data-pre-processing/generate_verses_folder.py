@@ -3,6 +3,13 @@ import sys
 import argparse
 import re
 
+# Add project root to sys.path to allow importing utils
+project_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+from utils.cli_args import create_base_parser
+
 def generate_verses_folder(data_path):
     for book in os.listdir(data_path):
         book_path = os.path.join(data_path, book)
@@ -26,13 +33,7 @@ def generate_verses_folder(data_path):
                                         os.makedirs(verse_folder, exist_ok=True)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Generate verses folder from the pre-processed data.')
-    parser.add_argument(
-        '--data_folder',
-        type=str,
-        default='../scraping/data/ewondo',
-        help='Path to the data folder containing the scraped files.'
-    )
+    parser = create_base_parser('Generate verses folder from the pre-processed data.')
     args = parser.parse_args()
     
     generate_verses_folder(args.data_folder)

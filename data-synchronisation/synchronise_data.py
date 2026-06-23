@@ -11,6 +11,8 @@ if project_root not in sys.path:
 # Add the current directory to sys.path to allow relative-like imports if needed
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+from utils.cli_args import create_base_parser, add_granularity_arguments
+
 from utils.logging_config import setup_logging
 
 try:
@@ -23,12 +25,8 @@ except ImportError:
 setup_logging()
 
 def main():
-    parser = argparse.ArgumentParser(description='Synchronizes local data with Google Drive.')
-    parser.add_argument('--data_folder', type=str, default='../scraping/data/ewondo', help='Path to local data.')
-    parser.add_argument('--book', type=str, help='Specific book (e.g., MAT).')
-    parser.add_argument('--chapter', type=str, help='Specific chapter (e.g., MAT_1).')
-    parser.add_argument('--verse', type=str, help='Specific verse (e.g., V_1).')
-    parser.add_argument('--preprocessor', type=str, help='Specific preprocessor workload to sync (e.g., pre_processor_1).')
+    parser = create_base_parser('Synchronizes local data with Google Drive.')
+    add_granularity_arguments(parser, include_verse=True, include_preprocessor=True)
     parser.add_argument('--headless', action='store_true', help='Console mode auth.')
     parser.add_argument('--no-verify', action='store_true', help='Skip verification.')
     
