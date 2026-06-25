@@ -2,6 +2,8 @@ import os
 import re
 import logging
 import json
+import sys
+
 try:
     from validator_utils import remove_punctuation, remove_extra_spaces, download_text_chapter_if_missing, get_verse_text
 except ImportError:
@@ -36,10 +38,24 @@ def verify_verse(data_path, book, chapter, verse, language="ewondo"):
         logging.debug(f"Expected text: '{expected_text}'")
         
         actual_clean = remove_extra_spaces(remove_punctuation(actual_text)) if actual_text else ""
-        expected_clean = remove_extra_spaces(remove_punctuation(expected_text))
+        expected_clean = remove_extra_spaces(remove_punctuation(expected_text)) if expected_text else ""
         
         if actual_clean != expected_clean:
-            raise AssertionError(f"Expected '{expected_clean}', but got '{actual_clean}'")
+            exception_text = ""
+            with open(os.path.join(data_path, f"exception.txt"), 'r', encoding='utf-8') as exception_file:
+                for line in exception_file:
+                    match = re.match(rf'^{chapter}\s+V_{verse_num}:\s*(.*)', line.strip())
+                    if match:
+                        exception_text = match.group(1)
+                        break
+                    
+                    
+            exception_clean = remove_extra_spaces(remove_punctuation(exception_text)) if exception_text else ""
+            if actual_clean == exception_clean:
+                print(f"Verse {verse} verification passed with exception!")
+                return True
+            else:  
+                raise AssertionError(f"Expected '{expected_clean}', but got '{actual_clean}'")
         
         print(f"Verse {verse} verification passed!")
         return True
