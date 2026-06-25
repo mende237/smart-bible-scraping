@@ -83,11 +83,45 @@ def get_statictics(data_folder):
     return stats
 
 
+def format_duration(seconds):
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = seconds % 60
+
+    parts = []
+    if hours != 0:
+        parts.append(f"{hours}h")
+    if minutes != 0:
+        parts.append(f"{minutes}m")
+
+    # Always display seconds (even if 0.00)
+    parts.append(f"{secs:.2f}s")
+
+    return " ".join(parts)
+
+
+
+def update_statistics_with_durations(stats, durations):
+    if len(durations) == 0:
+        stats["utterance_total_duration"] = format_duration(0)
+        stats["utterance_mean_duration"] = format_duration(0)
+        stats["utterance_median_duration"] = format_duration(0)
+        stats["utterance_max_duration"] = format_duration(0)
+        stats["utterance_min_duration"] = format_duration(0)
+        return stats
+    
+    stats["utterance_total_duration"] = format_duration(sum(durations))
+    stats["utterance_mean_duration"] = format_duration(statistics.mean(durations))
+    stats["utterance_median_duration"] = format_duration(statistics.median(durations))
+    stats["utterance_max_duration"] = format_duration(max(durations))
+    stats["utterance_min_duration"] = format_duration(min(durations))
+    return stats
+
+
 
 def get_segmented_chapter_statistics(data_folder, book, chapter, dump = True):
     chapter_path = os.path.join(data_folder, book, chapter)
     stats = {
-        "total_duration_seconds": 0,
         "durations": []
     }
                     
@@ -106,25 +140,12 @@ def get_segmented_chapter_statistics(data_folder, book, chapter, dump = True):
                         print(f"Warning: Skipping empty file: {wav_path}")
                         continue
                     duration = AudioSegment.from_wav(wav_path).duration_seconds
-                    stats["total_duration_seconds"] = stats.get("total_duration_seconds", 0) + duration
                     stats["durations"].append(duration)
 
     durations = stats["durations"]
-    
-    stats["total_duration_minutes"] = stats["total_duration_seconds"] / 60
-    if len(durations) > 0:
-        stats["utterance_mean_duration_seconds"] = statistics.mean(durations)
-        stats["utterance_median_duration_seconds"] = statistics.median(durations)
-        stats["utterance_max_duration_seconds"] = max(durations)
-        stats["utterance_min_duration_seconds"] = min(durations)
-    else:
-        stats["utterance_mean_duration_seconds"] = 0
-        stats["utterance_median_duration_seconds"] = 0
-        stats["utterance_max_duration_seconds"] = 0
-        stats["utterance_min_duration_seconds"] = 0
+    update_statistics_with_durations(stats, durations)
     
     del stats["durations"]
-    del stats["total_duration_seconds"]
     
     if dump:
         with open(f'{data_folder}/{chapter}_statistics.json', 'w', encoding='utf-8') as f:
@@ -136,7 +157,6 @@ def get_segmented_chapter_statistics(data_folder, book, chapter, dump = True):
 def get_segmented_book_statistics(data_folder, book, dump = True):
     book_path = os.path.join(data_folder, book)
     stats = {
-        "total_duration_seconds": 0,
         "durations": []
     }
                     
@@ -150,20 +170,12 @@ def get_segmented_book_statistics(data_folder, book, dump = True):
             stats[chapter] = chapter_statistics
             
         if chapter_durations is not None:
-            stats["total_duration_seconds"] += sum(chapter_durations)
             stats["durations"].extend(chapter_durations)
 
-    
-    stats["total_duration_hours"] = stats["total_duration_seconds"] / 3600
-    stats["utterance_mean_duration_seconds"] = statistics.mean(stats["durations"])
-    stats["utterance_median_duration_seconds"] = statistics.median(stats["durations"])
-    stats["utterance_max_duration_seconds"] = max(stats["durations"]) 
-    stats["utterance_min_duration_seconds"] = min(stats["durations"]) 
-    
     durations = stats["durations"]
+    update_statistics_with_durations(stats, durations)
     
     del stats["durations"]
-    del stats["total_duration_seconds"]
     
     if dump:
         with open(f'{data_folder}/{book}_statistics.json', 'w', encoding='utf-8') as f:
@@ -174,7 +186,6 @@ def get_segmented_book_statistics(data_folder, book, dump = True):
 
 def get_segmented_books_statistics(data_folder, books, dump = True):
     stats = {
-        "total_duration_seconds": 0,
         "durations": []
     }
     
@@ -189,22 +200,13 @@ def get_segmented_books_statistics(data_folder, books, dump = True):
             stats[book] = book_statistics
         
         if book_durations is not None:
-            stats["total_duration_seconds"] += sum(book_durations)
             stats["durations"].extend(book_durations)
         
-        
-    stats["total_duration_hours"] = stats["total_duration_seconds"] / 3600
-    stats["utterance_mean_duration_seconds"] = statistics.mean(stats["durations"])
-    stats["utterance_median_duration_seconds"] = statistics.median(stats["durations"])
-    stats["utterance_max_duration_seconds"] = max(stats["durations"])
-    stats["utterance_min_duration_seconds"] = min(stats["durations"])
-    
-    
     durations = stats["durations"]
+    update_statistics_with_durations(stats, durations)
     
     del stats["durations"]
-    del stats["total_duration_seconds"]
-    
+        
     file_name = '_'.join(books) + '_statistics.json'
     if dump:
         with open(f'{args.data_folder}/{file_name}', 'w', encoding='utf-8') as f:
@@ -231,7 +233,6 @@ def get_segmented_preprocessor_data_statistics(data_folder, preprocessor_name, d
         
     preprocessor_tasks = assignments[preprocessor_name]
     stats = {
-        "total_duration_seconds": 0,
         "durations": []
     }
     
@@ -245,7 +246,6 @@ def get_segmented_preprocessor_data_statistics(data_folder, preprocessor_name, d
                 stats[book] = book_statistics
             
             if book_durations is not None:
-                stats["total_duration_seconds"] += sum(book_durations)
                 stats["durations"].extend(book_durations)
         else:
             for chapter in chapters:
@@ -254,19 +254,13 @@ def get_segmented_preprocessor_data_statistics(data_folder, preprocessor_name, d
                     stats[f"{book}_{chapter}"] = chapter_statistics
                 
                 if chapter_durations is not None:
-                    stats["total_duration_seconds"] += sum(chapter_durations)
                     stats["durations"].extend(chapter_durations)
 
-    stats["total_duration_hours"] = stats["total_duration_seconds"] / 3600
-    stats["utterance_mean_duration_seconds"] = statistics.mean(stats["durations"])
-    stats["utterance_median_duration_seconds"] = statistics.median(stats["durations"])
-    stats["utterance_max_duration_seconds"] = max(stats["durations"])
-    stats["utterance_min_duration_seconds"] = min(stats["durations"])
     
     durations = stats["durations"]
-    
+    update_statistics_with_durations(stats, durations)
+        
     del stats["durations"]
-    del stats["total_duration_seconds"]
     
     file_name = f"{preprocessor_name}_statistics.json"
     if dump:
