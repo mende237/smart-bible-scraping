@@ -4,7 +4,7 @@ A modular toolkit designed to scrape audio and text versions of the Bible from [
 
 ## Project Structure
 
-- `scraping/`: Node.js tool powered by **Playwright** to automatically download text and audio versions of chapters.
+- `scraping/` : Node.js tool powered by **Playwright** to automatically download text and audio versions of chapters.
 - `data-pre-processing/`: Python scripts to organize, clean, and map scraped data.
 - `data-verification/`: Modular Python scripts to verify transcriptions against expected original text and log errors.
 - `data-synchronisation/`: A modular synchronization package to sync local data with Google Drive, supporting upload, download, and mandatory verification gates.
@@ -77,10 +77,9 @@ npx playwright install chromium
 ## 2. Data Pre-processing Module
 
 ### Scripts
-- **`main.py`**: Coordinates between language versions. It uses JSON maps in `map/` to copy corresponding French text into Ewondo chapter folders for alignment.
-- **`pre_process_verses.py`**: Cleans the scraped text files by merging multi-line verses and ensuring each verse starts on a new line with its number in brackets (e.g., `[1]`).
-- **`generate_verses_folder.py`**: Creates individual sub-folders for each verse (e.g., `V_1`, `V_2`) within each chapter folder, based on the verse numbers found in the text files.
-- **`generate_utterance_file.py`**: A monitoring script that watches the data directory for new `.wav` files (e.g., created during manual audio segmentation) and automatically generates matching empty `.txt` files for transcriptions.
+- **[pre_process_verses.py](data-pre-processing/pre_process_verses.py)**: Cleans the scraped text files by merging multi-line verses and ensuring each verse starts on a new line with its number in brackets (e.g., `[1]`).
+- **[generate_verses_folder.py](data-pre-processing/generate_verses_folder.py)** : Creates individual sub-folders for each verse (e.g., `V_1`, `V_2`) within each chapter folder, based on the verse numbers found in the text files.
+- **[generate_utterance_file.py](data-pre-processing/generate_utterance_file.py)**: A monitoring script that watches the data directory for new `.wav` files (e.g., created during manual audio segmentation) and automatically generates matching empty `.txt` files for transcriptions.
 
 ### Usage
 ```bash
@@ -102,11 +101,33 @@ python generate_utterance_file.py --data_folder ../scraping/data/ewondo
 
 ### Features
 - **Automated Verification**: Compares segmented audio transcriptions against the original scraped text to ensure accuracy.
+- **Exception Verification**: Fallback mechanism checking local `exception.txt` files to allow known orthographic discrepancies or alternative transcriptions.
 - **Auto-Recovery**: Automatically downloads and pre-processes missing reference text from Bible.com if it's not found in the local data folder.
-- **Modular Design**: Refactored into `validator.py` (core logic), `utils.py` (helpers), and `verify_data.py` (CLI entry point).
+- **Modular Design**: Refactored into **[validator.py](data-verification/validator.py)** (core logic),  **[util.py](data-verification/util.py)** (helpers), and  **[verify_data.py](data-verification/verify_data.py)** (CLI entry point).
 - **Granular Control**: Supports verification at the verse, chapter, book, or preprocessor assignment level.
 - **Detailed Logging**: Logs all mismatches and missing files to `data-verification/logs/verification_errors.log`.
 - **Exit Codes**: Returns `0` on success and `1` on failure, allowing integration into automated workflows.
+
+### Exception Verification
+
+When an audio segment transcription (`actual_clean`) doesn't match the expected scraped reference text (`expected_clean`), the verification system will check for a registered exception before failing.
+
+1. **File Location**: The exceptions are defined in a file named `exception.txt` placed at the root of the language data directory (e.g. `{data_folder}/exception.txt` like `scraping/data/ewondo/exception.txt`).
+2. **Format**: Each line in `exception.txt` must follow the format:
+   ```text
+   {chapter} V_{verse_number}: {exception_text}
+   ```
+   *Example:*
+   ```text
+   LUK_1 V_73: e sòṅ an gakani Abraham esya waan, na ayi bia vë na
+   COL_1 V_5: asu afidi bënganyie mina a yob, a mingatari wog a ebug bëbëla mbëmbë foe ya
+   ```
+3. **Logic**:
+   - The verification script parses `exception.txt` line by line looking for an entry matching the current `{chapter}` and `V_{verse_number}`.
+   - If a match is found, it cleans the exception text by removing punctuation and extra spaces.
+   - If the cleaned actual transcription matches the cleaned exception text, verification passes with a message:
+     `Verse V_{verse_number} verification passed with exception!`
+   - If no match is found or the texts still do not align, an `AssertionError` is raised.
 
 ### Usage
 ```bash
@@ -172,7 +193,7 @@ python assigning_data_to_pre_pocessors.py --data_folder ../scraping/data/ewondo 
 - **Granular Sync / Download**: Supports operations at the book, chapter, or verse level.
 - **Dual Authentication**: Supports both **Service Accounts** and **OAuth2 User Authentication** (recommended to use your personal storage quota).
 - **Headless Mode**: Special flag for authenticating on remote servers without browser access.
-- **Modular Package**: Refactored into `config.py`, `auth.py`, `synchronizer.py`, and `synchronise_data.py`.
+- **Modular Package**: Refactored into **[config.py](data-synchronisation/config.py)**, **[auth.py](data-synchronisation/auth.py)**, **[synchronizer.py](data-synchronisation/synchronizer.py)**, and **[synchronise_data.py](data-synchronisation/synchronise_data.py)**.
 
 ### Setup
 1. **Create a Google Cloud Project:**
