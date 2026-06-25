@@ -149,11 +149,11 @@ python verify_data.py --book MAT --chapter MAT_1 --verse V_1
 
 ### Scripts
 - **[data_statistics.py](utils/data_statistics.py)**: Analyzes scraped and processed dataset files to generate comprehensive statistics. It supports multiple modes of operations:
-  - **Global Dataset Statistics**: Calls [get_statictics](utils/data_statistics.py#L8) to extract metrics (number of books, chapters, verses, and audio duration statistics) from raw scraped files, saving them to `{data_folder}/statistics.json`.
-  - **Segmented Chapter Statistics**: Calls [get_segmented_chapter_statistics](utils/data_statistics.py#L82) to analyze segmented `.wav` files inside a specific chapter folder and generate `{chapter}_statistics.json`.
-  - **Segmented Book Statistics**: Calls [get_segmented_book_statistics](utils/data_statistics.py#L131) to compile segment statistics for all chapters of a book, saving them to `{book}_statistics.json`.
+  - **Global Dataset Statistics**: Calls [get_statictics](utils/data_statistics.py#L13) to extract metrics (number of books, chapters, verses, and audio duration statistics) from raw scraped files, saving them to `{data_folder}/statistics.json`.
+  - **Segmented Chapter Statistics**: Calls [get_segmented_chapter_statistics](utils/data_statistics.py#L122) to analyze segmented `.wav` files inside a specific chapter folder and generate `{chapter}_statistics.json`.
+  - **Segmented Book Statistics**: Calls [get_segmented_book_statistics](utils/data_statistics.py#L157) to compile segment statistics for all chapters of a book, saving them to `{book}_statistics.json`.
   - **Segmented Books Statistics**: Calls [get_segmented_books_statistics](utils/data_statistics.py#L170) to compile segment statistics for a custom list of books, saving them to `{books_list}_statistics.json`.
-  - **Preprocessor Workload Statistics**: Calls [get_segmented_preprocessor_data_statistics](utils/data_statistics.py#L213) to read `assignment.json` and generate workload statistics for a specific preprocessor, saving them to `{preprocessor_name}_statistics.json`.
+  - **Preprocessor Workload Statistics**: Calls [get_segmented_preprocessor_data_statistics](utils/data_statistics.py#L220) to read `assignment.json` and generate workload statistics for a specific preprocessor, saving them to `{preprocessor_name}_statistics.json`.
 - **[assigning_data_to_pre_pocessors.py](utils/assigning_data_to_pre_pocessors.py)**: Distributes the workload among a specified number of "pre-processors" by balancing the total audio duration assigned to each. It generates an `assignment.json` file.
 
 
