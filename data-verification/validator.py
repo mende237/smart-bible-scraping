@@ -64,6 +64,7 @@ def verify_verse(data_path, book, chapter, verse, language="ewondo"):
         logging.error(f"{book} {chapter} {verse} - {e}")
         return False
 
+
 def verify_chapter(data_path, book, chapter, language="ewondo"):
     logging.info(f"Starting verification for {book} - {chapter}")
     chapter_folder = os.path.join(data_path, book, chapter)
@@ -95,6 +96,27 @@ def verify_chapter(data_path, book, chapter, language="ewondo"):
     return failed_verses
 
 
+def verify_chapters(data_path, book, chapters, language="ewondo"):
+    logging.info(f"Starting verification for book: {book}")
+    failed_chapters = {}
+    
+    for chapter in chapters:
+        failed_verses = verify_chapter(data_path, book, chapter, language)
+        if failed_verses:
+            failed_chapters[chapter] = failed_verses
+            
+    if failed_chapters:
+        summary_msg = f"\nBook {book} verification completed with errors in chapters: {', '.join(failed_chapters.keys())}"
+        print(summary_msg)
+        logging.warning(summary_msg.strip())
+    else:
+        success_msg = f"\nAll chapters in book {book} verified successfully!"
+        print(success_msg)
+        logging.info(success_msg.strip())
+        
+    return failed_chapters
+
+
 def verify_book(data_path, book, language="ewondo"):
     logging.info(f"Starting verification for book: {book}")
     book_folder = os.path.join(data_path, book)
@@ -110,22 +132,30 @@ def verify_book(data_path, book, language="ewondo"):
     # Sort chapters numerically based on the chapter number
     chapter_folders.sort(key=lambda x: int(x.split('_')[1]) if len(x.split('_')) > 1 and x.split('_')[1].isdigit() else 0)
     
-    failed_chapters = {}
-    for chapter in chapter_folders:
-        failed_verses = verify_chapter(data_path, book, chapter, language)
-        if failed_verses:
-            failed_chapters[chapter] = failed_verses
+    failed_chapters = verify_chapters(data_path, book, chapter_folders, language)
+        
+    return failed_chapters
+
+
+def verify_books(data_path, books, language="ewondo"):
+    logging.info(f"Starting verification for books: {', '.join(books)}")
+    failed_books = {}
+    
+    for book in books:
+        failed_chapters = verify_book(data_path, book, language)
+        if failed_chapters:
+            failed_books[book] = failed_chapters
             
-    if failed_chapters:
-        summary_msg = f"\nBook {book} verification completed with errors in chapters: {', '.join(failed_chapters.keys())}"
+    if failed_books:
+        summary_msg = f"\nVerification completed with errors in books: {', '.join(failed_books.keys())}"
         print(summary_msg)
         logging.warning(summary_msg.strip())
     else:
-        success_msg = f"\nAll chapters in book {book} verified successfully!"
+        success_msg = f"\nAll books verified successfully!"
         print(success_msg)
         logging.info(success_msg.strip())
         
-    return failed_chapters
+    return failed_books
 
 
 def verify_preprocessor(data_path, preprocessor_name, language="ewondo"):

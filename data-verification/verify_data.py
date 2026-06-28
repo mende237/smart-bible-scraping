@@ -17,9 +17,9 @@ from utils.cli_args import create_base_parser, add_granularity_arguments
 from utils.logging_config import setup_logging
 
 try:
-    from validator import verify_verse, verify_chapter, verify_book, verify_preprocessor
+    from validator import verify_verse, verify_chapter, verify_chapters, verify_book, verify_books, verify_preprocessor
 except ImportError:
-    from .validator import verify_verse, verify_chapter, verify_book, verify_preprocessor
+    from .validator import verify_verse, verify_chapter, verify_chapters, verify_book, verify_books, verify_preprocessor
 
 # Configure logging
 log_file_path = os.path.join(os.path.dirname(__file__), 'logs', 'verification_errors.log')
@@ -29,7 +29,7 @@ LANGUAGE = "ewondo"
 
 if __name__ == "__main__":
     parser = create_base_parser('Verify verse transcriptions against the expected text.')
-    add_granularity_arguments(parser, include_verse=True, include_preprocessor=True)
+    add_granularity_arguments(parser, include_verse=True, include_preprocessor=True, include_books=True, include_chapters=True)
     parser.add_argument(
         '--json',
         action='store_true',
@@ -43,12 +43,22 @@ if __name__ == "__main__":
         if args.preprocessor:
             failures = verify_preprocessor(args.data_folder, args.preprocessor, LANGUAGE)
             results["failures"] = failures
+        elif args.books:
+            failures = verify_books(args.data_folder, args.books, LANGUAGE)
+            if failures:
+                results["failures"] = failures
         elif args.verse:
             if not args.book or not args.chapter:
                 parser.error("--book and --chapter are required when --verse is specified.")
             success = verify_verse(args.data_folder, args.book, args.chapter, args.verse, LANGUAGE)
             if not success:
                 results["failures"] = {args.book: {args.chapter: [args.verse]}}
+        elif args.chapters:
+            if not args.book:
+                parser.error("--book is required when --chapters is specified.")
+            failures = verify_chapters(args.data_folder, args.book, args.chapters, LANGUAGE)
+            if failures:
+                results["failures"] = {args.book: failures}
         elif args.chapter:
             if not args.book:
                 parser.error("--book is required when --chapter is specified.")
@@ -60,7 +70,7 @@ if __name__ == "__main__":
             if failures:
                 results["failures"] = {args.book: failures}
         else:
-            parser.error("You must specify either --preprocessor, or --book.")
+            parser.error("You must specify either --preprocessor, --book, --books, or --chapters.")
             
         if results["failures"]:
             results["failed"] = True

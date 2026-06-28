@@ -11,8 +11,8 @@ def create_base_parser(description: str) -> argparse.ArgumentParser:
     )
     return parser
 
-def add_granularity_arguments(parser: argparse.ArgumentParser, include_verse: bool = False, include_preprocessor: bool = False):
-    """Adds standard --book and --chapter arguments, and optionally --verse and --preprocessor."""
+def add_granularity_arguments(parser: argparse.ArgumentParser, include_verse: bool = False, include_preprocessor: bool = False, include_books: bool = False, include_chapters: bool = False):
+    """Adds standard --book and --chapter arguments, and optionally --verse, --preprocessor, --books, and --chapters."""
     parser.add_argument(
         '--book',
         type=str,
@@ -39,3 +39,20 @@ def add_granularity_arguments(parser: argparse.ArgumentParser, include_verse: bo
             default=None,
             help='Specific preprocessor workload (e.g., pre_processor_1).'
         )
+    if include_books:
+        parser.add_argument(
+            '--books',
+            type=str,
+            nargs='+',
+            default=None,
+            help='List of books to process (e.g., MAT MRK).'
+        )
+    if include_chapters:
+        parser.add_argument(
+            '--chapters',
+            type=str,
+            nargs='+',
+            default=None,
+            help='List of chapters to process (e.g., MAT_1 MAT_2). Must be used with --book.'
+        )
+

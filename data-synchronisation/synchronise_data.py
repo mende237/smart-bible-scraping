@@ -40,6 +40,14 @@ def handle_download(parser, args, synchronizer, data_path, lang_id):
             logging.error(f"Chapter '{args.chapter}' not found on Google Drive.")
             return
         synchronizer.download_verse(data_path, args.book, args.chapter, args.verse, chapter_id)
+    elif args.chapters:
+        if not args.book:
+            parser.error("--book is required with --chapters.")
+        book_id = synchronizer.get_folder_id(args.book, lang_id)
+        if not book_id:
+            logging.error(f"Book '{args.book}' not found on Google Drive.")
+            return
+        synchronizer.download_chapters(data_path, args.book, args.chapters, book_id)
     elif args.chapter:
         if not args.book:
             parser.error("--book is required with --chapter.")
@@ -48,10 +56,12 @@ def handle_download(parser, args, synchronizer, data_path, lang_id):
             logging.error(f"Book '{args.book}' not found on Google Drive.")
             return
         synchronizer.download_chapter(data_path, args.book, args.chapter, book_id)
+    elif args.books:
+        synchronizer.download_books(data_path, args.books, lang_id)
     elif args.book:
         synchronizer.download_book(data_path, args.book, lang_id)
     else:
-        parser.error("Specify --book, --chapter, --verse, or --preprocessor.")
+        parser.error("Specify --book, --books, --chapter, --chapters, --verse, or --preprocessor.")
 
 def handle_upload(parser, args, synchronizer, data_path, lang_id):
     """Handles the uploading/synchronisation workflow from local to Google Drive."""
@@ -63,19 +73,26 @@ def handle_upload(parser, args, synchronizer, data_path, lang_id):
         book_id = synchronizer.get_or_create_folder(args.book, lang_id)
         chapter_id = synchronizer.get_or_create_folder(args.chapter, book_id)
         synchronizer.sync_verse(data_path, args.book, args.chapter, args.verse, chapter_id)
+    elif args.chapters:
+        if not args.book:
+            parser.error("--book is required with --chapters.")
+        book_id = synchronizer.get_or_create_folder(args.book, lang_id)
+        synchronizer.sync_chapters(data_path, args.book, args.chapters, book_id)
     elif args.chapter:
         if not args.book:
             parser.error("--book is required with --chapter.")
         book_id = synchronizer.get_or_create_folder(args.book, lang_id)
         synchronizer.sync_chapter(data_path, args.book, args.chapter, book_id)
+    elif args.books:
+        synchronizer.sync_books(data_path, args.books, lang_id)
     elif args.book:
         synchronizer.sync_book(data_path, args.book, lang_id)
     else:
-        parser.error("Specify --book, --chapter, --verse, or --preprocessor.")
+        parser.error("Specify --book, --books, --chapter, --chapters, --verse, or --preprocessor.")
 
 def main():
     parser = create_base_parser('Synchronizes local data with Google Drive.')
-    add_granularity_arguments(parser, include_verse=True, include_preprocessor=True)
+    add_granularity_arguments(parser, include_verse=True, include_preprocessor=True, include_books=True, include_chapters=True)
     parser.add_argument('--headless', action='store_true', help='Console mode auth.')
     parser.add_argument('--no-verify', action='store_true', help='Skip verification.')
     parser.add_argument('--download', action='store_true', help='Download from Google Drive instead of uploading.')
@@ -85,16 +102,24 @@ def main():
     if not PARENT_FOLDER_ID:
         logging.error("DRIVE_FOLDER_ID not set in .env")
         return
-
+ 
     data_path = os.path.normpath(os.path.join(BASE_DIR, args.data_folder)) if not os.path.isabs(args.data_folder) else args.data_folder
-
+ 
     synchronizer = DataSynchronizer(headless=args.headless)
-
+ 
     # 1. Verification Gate
     if not args.no_verify and not args.download:
-        if not args.book and not args.preprocessor:
-            parser.error("At least --book or --preprocessor is required unless --no-verify is used.")
-        if not synchronizer.run_verification(data_path, args.book, args.chapter, args.verse, args.preprocessor):
+        if not args.book and not args.preprocessor and not args.books:
+            parser.error("At least --book, --books, or --preprocessor is required unless --no-verify is used.")
+        if not synchronizer.run_verification(
+            data_path=data_path,
+            book=args.book,
+            chapter=args.chapter,
+            verse=args.verse,
+            preprocessor=args.preprocessor,
+            books=args.books,
+            chapters=args.chapters
+        ):
             return
 
     # 2. Sync Execution

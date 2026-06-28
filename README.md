@@ -138,8 +138,20 @@ python verify_data.py --preprocessor pre_processor_1
 # Verify a specific book
 python verify_data.py --book MAT
 
+# Verify multiple books
+python verify_data.py --books MAT MRK
+
+# Verify multiple books, and output results in JSON format
+python verify_data.py --books MAT MRK --json
+
 # Verify a specific chapter
 python verify_data.py --book MAT --chapter MAT_1
+
+# Verify multiple chapters
+python verify_data.py --book MAT --chapters MAT_1 MAT_2
+
+# Verify multiple chapters within a custom data directory
+python verify_data.py --data_folder ../custom_data/ewondo --book MAT --chapters MAT_1 MAT_2
 
 # Verify a specific verse
 python verify_data.py --book MAT --chapter MAT_1 --verse V_1
@@ -256,11 +268,23 @@ python synchronise_data.py --book MAT
 # Download a specific book from Google Drive to local folder
 python synchronise_data.py --book MAT --download
 
+# Synchronize multiple books
+python synchronise_data.py --books MAT MRK
+
+# Download multiple books from Google Drive to local folder
+python synchronise_data.py --books MAT MRK --download
+
 # Synchronize a specific chapter
 python synchronise_data.py --book MAT --chapter MAT_1
 
 # Download a specific chapter from Google Drive
 python synchronise_data.py --book MAT --chapter MAT_1 --download
+
+# Synchronize multiple chapters
+python synchronise_data.py --book MAT --chapters MAT_1 MAT_2
+
+# Download multiple chapters from Google Drive
+python synchronise_data.py --book MAT --chapters MAT_1 MAT_2 --download
 
 # Synchronize a specific verse
 python synchronise_data.py --book MAT --chapter MAT_1 --verse V_1
@@ -286,7 +310,9 @@ All scripts support the `--data_folder` argument, and specific scripts extend th
 | :--- | :--- | :--- | :--- |
 | `--data_folder` | `str` | `../scraping/data/ewondo` | Path to the local data directory. |
 | `--book` | `str` | `None` | Target a specific book (e.g., `MAT`). |
+| `--books` | `list` | `None` | Target multiple books (e.g., `MAT MRK`). |
 | `--chapter` | `str` | `None` | Target a specific chapter (e.g., `MAT_1`). Requires `--book`. |
+| `--chapters` | `list` | `None` | Target multiple chapters (e.g., `MAT_1 MAT_2`). Requires `--book`. |
 | `--verse` | `str` | `None` | Target a specific verse folder (e.g., `V_1`). |
 | `--preprocessor`| `str` | `None` | Target a specific preprocessor workload assignment. |
 
