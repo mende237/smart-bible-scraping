@@ -313,7 +313,8 @@ All scripts support the `--data_folder` argument, and specific scripts extend th
 | `--books` | `list` | `None` | Target multiple books (e.g., `MAT MRK`). |
 | `--chapter` | `str` | `None` | Target a specific chapter (e.g., `MAT_1`). Requires `--book`. |
 | `--chapters` | `list` | `None` | Target multiple chapters (e.g., `MAT_1 MAT_2`). Requires `--book`. |
-| `--verse` | `str` | `None` | Target a specific verse folder (e.g., `V_1`). |
+| `--verse` | `str` | `None` | Target a specific verse folder (e.g., `V_1`). Requires `--book` and `--chapter`. |
+|
 | `--preprocessor`| `str` | `None` | Target a specific preprocessor workload assignment. |
 
 ### Script-Specific Parameter Matrix
