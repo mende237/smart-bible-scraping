@@ -338,8 +338,8 @@ scraping/data/
 │   └── MAT/
 │       └── MAT_1/
 │           ├── MAT_1.mp3      (Full Chapter Audio)
-│           ├── MAT_1.txt      (Cleaned Ewondo Text)
-│           ├── MAT_1_fr.txt   (French Text - for alignment)
+│           ├── MAT_1_ewondo.txt      (Cleaned Ewondo Text)
+│           ├── MAT_1_french.txt   (French Text - for alignment)
 │           ├── V_1/           (Verse-specific folder)
 │           │   ├── V_1_UTT_1.wav  (Segmented Audio)
 │           │   └── V_1_UTT_1.txt  (Utterance Transcription)
