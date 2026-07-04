@@ -167,6 +167,7 @@ python verify_data.py --book MAT --chapter MAT_1 --verse V_1
   - **Segmented Books Statistics**: Calls [get_segmented_books_statistics](utils/data_statistics.py#L170) to compile segment statistics for a custom list of books, saving them to `{books_list}_statistics.json`.
   - **Preprocessor Workload Statistics**: Calls [get_segmented_preprocessor_data_statistics](utils/data_statistics.py#L220) to read `assignment.json` and generate workload statistics for a specific preprocessor, saving them to `{preprocessor_name}_statistics.json`.
 - **[assigning_data_to_pre_pocessors.py](utils/assigning_data_to_pre_pocessors.py)**: Distributes the workload among a specified number of "pre-processors" by balancing the total audio duration assigned to each. It generates an `assignment.json` file.
+- **[convert_to_aglc.py](utils/convert_to_aglc.py)**: Converts transcription text files to the AGLC (Alphabet Gènèral des Langues Camérounaises) phonetic representation. It reads standard transcription files and creates new `_AGLC.txt` files with characters mapped according to a predefined dictionary (e.g., `ë` -> `ə`, `ṅ` -> `ŋ`). This is useful for generating phonetic datasets for ASR model training.
 
 
 *For a complete reference of the CLI parameters supported by this script and others, see the [Shared CLI Arguments Reference](#6-shared-cli-arguments-reference) section.*
@@ -193,6 +194,9 @@ python data_statistics.py --data_folder ../scraping/data/ewondo --preprocessor p
 
 # Assign data to 5 pre-processors
 python assigning_data_to_pre_pocessors.py --data_folder ../scraping/data/ewondo --nbr_pre_processors 5
+
+# Convert a book's transcriptions to AGLC format
+python convert_to_aglc.py --data_folder ../scraping/data/ewondo --book MAT
 ```
 
 ## 5. Data Synchronisation Module
