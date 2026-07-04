@@ -3,13 +3,17 @@ import argparse
 import statistics
 import json
 from pydub import AudioSegment
+import logging
 
 try:
-    from cli_args import create_base_parser
+    from cli_args import create_base_parser, add_granularity_arguments
+    from logging_config import setup_logging
 except ImportError:
-    from utils.cli_args import create_base_parser
+    from utils.cli_args import create_base_parser, add_granularity_arguments
+    from utils.logging_config import setup_logging
 
-
+# Configure logging
+setup_logging()
 def get_statictics(data_folder):
     stats = {}
     for book in os.listdir(data_folder):
@@ -41,7 +45,7 @@ def get_statictics(data_folder):
                         mp3_path = os.path.join(chapter_path, file)
                         # Skip empty files
                         if os.path.getsize(mp3_path) == 0:
-                            print(f"Warning: Skipping empty file: {mp3_path}")
+                            logging.warning(f"Skipping empty file: {mp3_path}")
                             continue
                         duration = AudioSegment.from_mp3(mp3_path).duration_seconds
                         if language not in stats:
@@ -54,7 +58,7 @@ def get_statictics(data_folder):
                             stats[language]["total_duration_seconds"] += duration
                             stats[language].setdefault("durations", []).append(duration)
                     except Exception as e:
-                        print(f"Warning: Failed to process {mp3_path}: {str(e)}")
+                        logging.warning(f"Failed to process {mp3_path}: {str(e)}")
                     
                     
             for language in stats.keys():
@@ -126,7 +130,7 @@ def get_segmented_chapter_statistics(data_folder, book, chapter, dump = True):
     }
                     
     if not os.path.exists(chapter_path):
-        print(f"Error: Chapter path '{chapter_path}' does not exist.")
+        logging.error(f"Chapter path '{chapter_path}' does not exist.")
         return None, None
     
     for verse in os.listdir(chapter_path):
@@ -137,7 +141,7 @@ def get_segmented_chapter_statistics(data_folder, book, chapter, dump = True):
                     wav_path = os.path.join(verse_path, utterance)
                     # Skip empty files
                     if os.path.getsize(wav_path) == 0:
-                        print(f"Warning: Skipping empty file: {wav_path}")
+                        logging.warning(f"Skipping empty file: {wav_path}")
                         continue
                     duration = AudioSegment.from_wav(wav_path).duration_seconds
                     stats["durations"].append(duration)
@@ -161,7 +165,7 @@ def get_segmented_book_statistics(data_folder, book, dump = True):
     }
                     
     if not os.path.exists(book_path):
-        print(f"Error: Book path '{book_path}' does not exist.")
+        logging.error(f"Book path '{book_path}' does not exist.")
         return None, None
     
     for chapter in os.listdir(book_path):        
@@ -192,7 +196,7 @@ def get_segmented_books_statistics(data_folder, books, dump = True):
     for book in books:
         book_path = os.path.join(data_folder, book)
         if not os.path.exists(book_path):
-            print(f"Error: Book path '{book_path}' does not exist.")
+            logging.error(f"Book path '{book_path}' does not exist.")
             continue
         
         book_statistics, book_durations = get_segmented_book_statistics(data_folder, book, dump=False)
@@ -221,14 +225,14 @@ def get_segmented_preprocessor_data_statistics(data_folder, preprocessor_name, d
     assignment_file = os.path.join(data_folder, "assignment.json")
     
     if not os.path.exists(assignment_file):
-        print(f"Error: Assignment file not found: {assignment_file}")
+        logging.error(f"Assignment file not found: {assignment_file}")
         return None, None
 
     with open(assignment_file, 'r', encoding='utf-8') as f:
         assignments = json.load(f)
         
     if preprocessor_name not in assignments:
-        print(f"Error: Preprocessor '{preprocessor_name}' not found in assignment file.")
+        logging.error(f"Preprocessor '{preprocessor_name}' not found in assignment file.")
         return None, None
         
     preprocessor_tasks = assignments[preprocessor_name]
@@ -272,52 +276,27 @@ def get_segmented_preprocessor_data_statistics(data_folder, preprocessor_name, d
     
 if __name__ == '__main__':
     parser = create_base_parser('Extract statistics from scraped Bible audio and text files.')
-
-    # Group for mutually exclusive book arguments
-    selection_group = parser.add_mutually_exclusive_group()
-    selection_group.add_argument(
-        '--book',
-        type=str,
-        default=None,
-        help='A single book to get statistics for (e.g., LUK). Can be used with --chapter.'
-    )
-    selection_group.add_argument(
-        '--books',
-        nargs='+',
-        type=str,
-        default=None,
-        help='A list of books to get segmented statistics for (e.g., MAT LUK).'
-    )
-    selection_group.add_argument(
-        '--preprocessor',
-        type=str,
-        default=None,
-        help='The preprocessor to get statistics for (e.g., pre_processor_1).'
-    )
-
-    parser.add_argument(
-        '--chapter',
-        type=str,
-        default=None,
-        help='The chapter to get segmented statistics for (e.g., MAT_1). Must be used with --book.'
-    )
+    add_granularity_arguments(parser, include_preprocessor=True, include_books=True, include_chapters=True)
     args = parser.parse_args()
     
     if args.chapter and not args.book:
         parser.error("--book is required when --chapter is provided.")
+        
+    if args.chapters and not args.book:
+        parser.error("--book is required when --chapters is provided.")
 
     if args.preprocessor:
-        print(f"Getting segmented statistics for preprocessor: '{args.preprocessor}'...")
+        logging.info(f"Getting segmented statistics for preprocessor: '{args.preprocessor}'...")
         get_segmented_preprocessor_data_statistics(args.data_folder, args.preprocessor)
     elif args.books:
-        print(f"Getting segmented statistics for books: {', '.join(args.books)}...")
+        logging.info(f"Getting segmented statistics for books: {', '.join(args.books)}...")
         stats = get_segmented_books_statistics(args.data_folder, args.books)
-    elif args.book and not args.chapter:
-        print(f"Getting segmented book statistics for book: '{args.book}'...")
+    elif args.book and not args.chapter and not args.chapters:
+        logging.info(f"Getting segmented book statistics for book: '{args.book}'...")
         get_segmented_book_statistics(args.data_folder, args.book)
     elif args.book and args.chapter:
-        print(f"Getting segmented chapter statistics for book: '{args.book}', chapter: '{args.chapter}'...")
+        logging.info(f"Getting segmented chapter statistics for book: '{args.book}', chapter: '{args.chapter}'...")
         get_segmented_chapter_statistics(args.data_folder, args.book, args.chapter)
     else:
-        print("Getting statistics for the entire dataset...")
+        logging.info("Getting statistics for the entire dataset...")
         get_statictics(args.data_folder)
