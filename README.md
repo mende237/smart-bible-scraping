@@ -205,6 +205,7 @@ python convert_to_aglc.py --data_folder ../scraping/data/ewondo --book MAT
 - **Bidirectional Sync / Cloud Backup**: Synchronizes local data with Google Drive. Supports both uploading local work to Drive and downloading data from Drive to local folders.
 - **Verification Gate**: Automated verification before synchronization.
 - **Partial Sync**: **Smart synchronization logic** that skips individual verses that fail verification while still uploading those that pass.
+- **Date-aware Upload Skip**: When a file already exists on Google Drive, the synchronizer compares modification times and skips the upload if the Drive copy is already up to date, saving time.
 - **Preprocessor Support**: Effortlessly synchronize or download an entire workload assigned to a specific preprocessor.
 - **Granular Sync / Download**: Supports operations at the book, chapter, or verse level.
 - **Dual Authentication**: Supports both **Service Accounts** and **OAuth2 User Authentication** (recommended to use your personal storage quota).
@@ -299,6 +300,9 @@ python synchronise_data.py --book MAT --chapter MAT_1 --verse V_1 --download
 # Skip verification gate (Force Sync)
 python synchronise_data.py --book MAT --no-verify
 
+# Force upload even if the Drive copy already has the same or newer modification date
+python synchronise_data.py --book MAT --no-date-check
+
 # Synchronize on a remote server (SSH)
 python synchronise_data.py --book MAT --headless
 ```
@@ -330,7 +334,7 @@ The table below shows which standard and unique parameters are supported by each
 | **[generate_verses_folder.py](data-pre-processing/generate_verses_folder.py)** | `--data_folder` | *None* |
 | **[generate_utterance_file.py](data-pre-processing/generate_utterance_file.py)** | `--data_folder` | *None* |
 | **[verify_data.py](data-verification/verify_data.py)** | All common arguments | `--json`: Output verification errors as a JSON block. |
-| **[synchronise_data.py](data-synchronisation/synchronise_data.py)** | All common arguments | `--headless`: SSH/console-mode authentication.<br>`--no-verify`: Skip verification gate before synchronization.<br>`--download`: Download from Google Drive instead of uploading. |
+| **[synchronise_data.py](data-synchronisation/synchronise_data.py)** | All common arguments | `--headless`: SSH/console-mode authentication.<br>`--no-verify`: Skip verification gate before synchronization.<br>`--no-date-check`: Force upload even when the Drive copy already has the same or newer modification date.<br>`--download`: Download from Google Drive instead of uploading. |
 | **[data_statistics.py](utils/data_statistics.py)** | `--data_folder`, `--book`, `--chapter`, `--preprocessor` | `--books`: space-separated list of books to compile metrics (mutually exclusive with `--book` and `--preprocessor`). |
 | **[assigning_data_to_pre_pocessors.py](utils/assigning_data_to_pre_pocessors.py)**| `--data_folder` | `--nbr_pre_processors` (default `5`): Total partitions. |
 
@@ -363,3 +367,4 @@ scraping/data/
 - **Storage Quota Exceeded (Error 403: storageQuotaExceeded)**: Service accounts have a very limited shared storage. Configure and use OAuth2 with `client-secret.json` to utilize your personal account's Google Drive storage instead.
 - **Drive Folder ID Not Found or Access Error**: Ensure that `DRIVE_FOLDER_ID` is set correctly in your `.env` file, and that the target Google Drive folder is shared with the account executing the script (e.g. Editor permission).
 - **Verification Failures During Upload**: If synchronization is blocked because of local text validation failures, you can bypass the checks using the `--no-verify` flag.
+- **Forced Re-upload**: If you need to resend a file despite the date-based optimization, use `--no-date-check`.
