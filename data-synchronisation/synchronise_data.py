@@ -96,6 +96,7 @@ def main():
     parser.add_argument('--headless', action='store_true', help='Console mode auth.')
     parser.add_argument('--no-verify', action='store_true', help='Skip verification.')
     parser.add_argument('--download', action='store_true', help='Download from Google Drive instead of uploading.')
+    parser.add_argument('--no-date-check', action='store_true', help='Disable date-based upload skipping when a file already exists on Google Drive.')
     
     args = parser.parse_args()
     
@@ -106,6 +107,7 @@ def main():
     data_path = os.path.normpath(os.path.join(BASE_DIR, args.data_folder)) if not os.path.isabs(args.data_folder) else args.data_folder
  
     synchronizer = DataSynchronizer(headless=args.headless)
+    synchronizer.enable_date_check = not args.no_date_check
  
     # 1. Verification Gate
     if not args.no_verify and not args.download:

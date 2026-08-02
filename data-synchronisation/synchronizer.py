@@ -4,6 +4,7 @@ import subprocess
 import sys
 import logging
 import json
+from datetime import datetime, timezone
 from typing import Optional, Dict, List
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
@@ -16,6 +17,7 @@ class DataSynchronizer:
     def __init__(self, headless: bool = False):
         self.service = get_drive_service(headless)
         self.failures: Dict[str, Dict[str, List[str]]] = {}
+        self.enable_date_check: bool = True
 
     def get_or_create_folder(self, folder_name: str, parent_id: Optional[str] = None) -> Optional[str]:
         """Finds or creates a folder on Google Drive."""
@@ -88,11 +90,48 @@ class DataSynchronizer:
         else:
             logging.error(f"Error importing/updating '{file_name}': {error}")
 
+    def _get_remote_modified_time(self, file_id: str) -> Optional[datetime]:
+        """Returns the last modified time of a Google Drive file as a UTC datetime."""
+        try:
+            result = self.service.files().get(
+                fileId=file_id,
+                fields='modifiedTime',
+                supportsAllDrives=True
+            ).execute()
+            remote_modified_time = result.get('modifiedTime')
+            if not remote_modified_time:
+                return None
+
+            if remote_modified_time.endswith('Z'):
+                remote_modified_time = remote_modified_time[:-1] + '+00:00'
+
+            return datetime.fromisoformat(remote_modified_time).astimezone(timezone.utc)
+        except Exception as error:
+            logging.warning(f"Unable to read modified time for file '{file_id}': {error}")
+            return None
+
+    def _should_skip_upload(self, local_path: str, file_id: str) -> bool:
+        """Returns True when the remote file is already up to date or newer."""
+        if not file_id:
+            return False
+
+        local_modified_time = datetime.fromtimestamp(os.path.getmtime(local_path), tz=timezone.utc)
+        remote_modified_time = self._get_remote_modified_time(file_id)
+
+        if remote_modified_time is None:
+            return False
+
+        return remote_modified_time >= local_modified_time
+
     def upload_file(self, local_path: str, parent_id: str):
         """Uploads or updates a file on Google Drive."""
         file_name = os.path.basename(local_path)
         file_id = self.get_file_id(file_name, parent_id)
         
+        if file_id and self.enable_date_check and self._should_skip_upload(local_path, file_id):
+            logging.info(f"Skipping upload for '{file_name}' because the Drive copy is up to date.")
+            return
+
         try:
             mime_type, _ = mimetypes.guess_type(local_path)
             media = MediaFileUpload(local_path, mimetype=mime_type or 'application/octet-stream')
