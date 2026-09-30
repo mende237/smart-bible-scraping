@@ -10,6 +10,19 @@ A modular toolkit designed to scrape audio and text versions of the Bible from [
 - `data-synchronisation/`: A modular synchronization package to sync local data with Google Drive, supporting upload, download, and mandatory verification gates.
 - `utils/`: Helper scripts for data analysis and task distribution.
 
+## Overall Architecture
+
+The following diagram illustrates the complete workflow and interactions between all modules:
+
+![Overall Architecture](screenshot/overall_architecture.png)
+
+**Data Flow:**
+1. **Scraping Module** → Downloads Bible text and audio from Bible.com
+2. **Data Pre-processing Module** → Organizes and cleans the raw scraped data
+3. **Utilities Module** → Analyzes dataset statistics and distributes workload to preprocessors
+4. **Data Verification Module** → Validates segmented transcriptions against original text
+5. **Data Synchronisation Module** → Syncs verified data with Google Drive for backup and collaboration
+
 ## Prerequisites
 
 ### System Tools
@@ -66,7 +79,7 @@ npx playwright install chromium
 
 | Argument | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `--language` | `str` | `french` | Language identifier (e.g., `french`, `ewondo`). <br>**Note on adding languages:** If you want to add support for a new language, you must visit [Bible.com](https://www.bible.com) to find the correct Bible version code (e.g. `NTE12`) and numeric version ID (e.g. `1854`), and add them to the version mappings inside [scrapping.js](scraping/src/scrapping.js#L39-L55). |
+| `--language` | `str` | `french` | Language identifier (e.g., `french`, `ewondo`). <br>**Note on adding languages:** If you want to add support for a new language, you must visit [Bible.com](https://[...]
 | `--book` | `str` | `MAT` | USFM book code to scrape (e.g., `MAT`, `MRK`, `LUK`, `JHN`). |
 | `--chapter` | `int` | `1` | Starting chapter number. |
 | `--suffix` | `str` | `""` | Optional suffix to append to the filename (e.g. `original`). |
@@ -77,9 +90,9 @@ npx playwright install chromium
 ## 2. Data Pre-processing Module
 
 ### Scripts
-- **[pre_process_verses.py](data-pre-processing/pre_process_verses.py)**: Cleans the scraped text files by merging multi-line verses and ensuring each verse starts on a new line with its number in brackets (e.g., `[1]`).
-- **[generate_verses_folder.py](data-pre-processing/generate_verses_folder.py)** : Creates individual sub-folders for each verse (e.g., `V_1`, `V_2`) within each chapter folder, based on the verse numbers found in the text files.
-- **[generate_utterance_file.py](data-pre-processing/generate_utterance_file.py)**: A monitoring script that watches the data directory for new `.wav` files (e.g., created during manual audio segmentation) and automatically generates matching empty `.txt` files for transcriptions.
+- **[pre_process_verses.py](data-pre-processing/pre_process_verses.py)**: Cleans the scraped text files by merging multi-line verses and ensuring each verse starts on a new line with its number in bra[...]
+- **[generate_verses_folder.py](data-pre-processing/generate_verses_folder.py)** : Creates individual sub-folders for each verse (e.g., `V_1`, `V_2`) within each chapter folder, based on the verse num[...]
+- **[generate_utterance_file.py](data-pre-processing/generate_utterance_file.py)**: A monitoring script that watches the data directory for new `.wav` files (e.g., created during manual audio segmenta[...]
 
 ### Usage
 ```bash
@@ -103,7 +116,7 @@ python generate_utterance_file.py --data_folder ../scraping/data/ewondo
 - **Automated Verification**: Compares segmented audio transcriptions against the original scraped text to ensure accuracy.
 - **Exception Verification**: Fallback mechanism checking local `exception.txt` files to allow known orthographic discrepancies or alternative transcriptions.
 - **Auto-Recovery**: Automatically downloads and pre-processes missing reference text from Bible.com if it's not found in the local data folder.
-- **Modular Design**: Refactored into **[validator.py](data-verification/validator.py)** (core logic),  **[util.py](data-verification/util.py)** (helpers), and  **[verify_data.py](data-verification/verify_data.py)** (CLI entry point).
+- **Modular Design**: Refactored into **[validator.py](data-verification/validator.py)** (core logic),  **[util.py](data-verification/util.py)** (helpers), and  **[verify_data.py](data-verification/ve[...]
 - **Granular Control**: Supports verification at the verse, chapter, book, or preprocessor assignment level.
 - **Detailed Logging**: Logs all mismatches and missing files to `data-verification/logs/verification_errors.log`.
 - **Exit Codes**: Returns `0` on success and `1` on failure, allowing integration into automated workflows.
@@ -112,7 +125,7 @@ python generate_utterance_file.py --data_folder ../scraping/data/ewondo
 
 When an audio segment transcription (`actual_clean`) doesn't match the expected scraped reference text (`expected_clean`), the verification system will check for a registered exception before failing.
 
-1. **File Location**: The exceptions are defined in a file named `exception.txt` placed at the root of the language data directory (e.g. `{data_folder}/exception.txt` like `scraping/data/ewondo/exception.txt`).
+1. **File Location**: The exceptions are defined in a file named `exception.txt` placed at the root of the language data directory (e.g. `{data_folder}/exception.txt` like `scraping/data/ewondo/except[...]
 2. **Format**: Each line in `exception.txt` must follow the format:
    ```text
    {chapter} V_{verse_number}: {exception_text}
@@ -161,13 +174,13 @@ python verify_data.py --book MAT --chapter MAT_1 --verse V_1
 
 ### Scripts
 - **[data_statistics.py](utils/data_statistics.py)**: Analyzes scraped and processed dataset files to generate comprehensive statistics. It supports multiple modes of operations:
-  - **Global Dataset Statistics**: Calls [get_statictics](utils/data_statistics.py#L13) to extract metrics (number of books, chapters, verses, and audio duration statistics) from raw scraped files, saving them to `{data_folder}/statistics.json`.
-  - **Segmented Chapter Statistics**: Calls [get_segmented_chapter_statistics](utils/data_statistics.py#L122) to analyze segmented `.wav` files inside a specific chapter folder and generate `{chapter}_statistics.json`.
-  - **Segmented Book Statistics**: Calls [get_segmented_book_statistics](utils/data_statistics.py#L157) to compile segment statistics for all chapters of a book, saving them to `{book}_statistics.json`.
-  - **Segmented Books Statistics**: Calls [get_segmented_books_statistics](utils/data_statistics.py#L170) to compile segment statistics for a custom list of books, saving them to `{books_list}_statistics.json`.
-  - **Preprocessor Workload Statistics**: Calls [get_segmented_preprocessor_data_statistics](utils/data_statistics.py#L220) to read `assignment.json` and generate workload statistics for a specific preprocessor, saving them to `{preprocessor_name}_statistics.json`.
-- **[assigning_data_to_pre_pocessors.py](utils/assigning_data_to_pre_pocessors.py)**: Distributes the workload among a specified number of "pre-processors" by balancing the total audio duration assigned to each. It generates an `assignment.json` file.
-- **[convert_to_aglc.py](utils/convert_to_aglc.py)**: Converts transcription text files to the AGLC (Alphabet Gènèral des Langues Camérounaises) phonetic representation. It reads standard transcription files and creates new `_AGLC.txt` files with characters mapped according to a predefined dictionary (e.g., `ë` -> `ə`, `ṅ` -> `ŋ`). This is useful for generating phonetic datasets for ASR model training.
+  - **Global Dataset Statistics**: Calls [get_statictics](utils/data_statistics.py#L13) to extract metrics (number of books, chapters, verses, and audio duration statistics) from raw scraped files, sa[...]
+  - **Segmented Chapter Statistics**: Calls [get_segmented_chapter_statistics](utils/data_statistics.py#L122) to analyze segmented `.wav` files inside a specific chapter folder and generate `{chapter}[...]
+  - **Segmented Book Statistics**: Calls [get_segmented_book_statistics](utils/data_statistics.py#L157) to compile segment statistics for all chapters of a book, saving them to `{book}_statistics.json[...]
+  - **Segmented Books Statistics**: Calls [get_segmented_books_statistics](utils/data_statistics.py#L170) to compile segment statistics for a custom list of books, saving them to `{books_list}_statist[...]
+  - **Preprocessor Workload Statistics**: Calls [get_segmented_preprocessor_data_statistics](utils/data_statistics.py#L220) to read `assignment.json` and generate workload statistics for a specific pr[...]
+- **[assigning_data_to_pre_pocessors.py](utils/assigning_data_to_pre_pocessors.py)**: Distributes the workload among a specified number of "pre-processors" by balancing the total audio duration assign[...]
+- **[convert_to_aglc.py](utils/convert_to_aglc.py)**: Converts transcription text files to the AGLC (Alphabet Gènèral des Langues Camérounaises) phonetic representation. It reads standard transcrip[...]
 
 
 *For a complete reference of the CLI parameters supported by this script and others, see the [Shared CLI Arguments Reference](#6-shared-cli-arguments-reference) section.*
@@ -210,7 +223,7 @@ python convert_to_aglc.py --data_folder ../scraping/data/ewondo --book MAT
 - **Granular Sync / Download**: Supports operations at the book, chapter, or verse level.
 - **Dual Authentication**: Supports both **Service Accounts** and **OAuth2 User Authentication** (recommended to use your personal storage quota).
 - **Headless Mode**: Special flag for authenticating on remote servers without browser access.
-- **Modular Package**: Refactored into **[config.py](data-synchronisation/config.py)**, **[auth.py](data-synchronisation/auth.py)**, **[synchronizer.py](data-synchronisation/synchronizer.py)**, and **[synchronise_data.py](data-synchronisation/synchronise_data.py)**.
+- **Modular Package**: Refactored into **[config.py](data-synchronisation/config.py)**, **[auth.py](data-synchronisation/auth.py)**, **[synchronizer.py](data-synchronisation/synchronizer.py)**, and **[...]
 
 ### Setup
 1. **Create a Google Cloud Project:**
@@ -224,7 +237,7 @@ python convert_to_aglc.py --data_folder ../scraping/data/ewondo --book MAT
    - Choose **External** and fill in the required app information.
    - **Test Users (Crucial):** Scroll down to "Test users" and add **every Gmail address** (yours and your collaborators') that will use the script. 
      - *Note:* If an email is not added here, the user will get an **"Error 403: access_denied"** when trying to log in.
-   - **Note on Security Warning:** Since the app is not verified by Google, you will see a "Google hasn't verified this app" message during the first login. Click **Advanced** and then **Go to [Your Project Name] (unsafe)** to proceed.
+   - **Note on Security Warning:** Since the app is not verified by Google, you will see a "Google hasn't verified this app" message during the first login. Click **Advanced** and then **Go to [Your P[...]
 4. **Obtain Credentials:**
    - **For `client-secret.json` (Personal Quota - Recommended):**
      - Go to **APIs & Services > Credentials**.
@@ -246,7 +259,7 @@ python convert_to_aglc.py --data_folder ../scraping/data/ewondo --book MAT
 ### Language Folder Mapping & Directory Structure
 
 > [!IMPORTANT]
-> Before launching the script to **download**, ensure that the last segment of the `--data_folder` path value matches exactly with the folder hosting your data on Google Drive. If they do not match, the execution will abort with:
+> Before launching the script to **download**, ensure that the last segment of the `--data_folder` path value matches exactly with the folder hosting your data on Google Drive. If they do not match, t[...]
 >
 > `Language folder '{last segment}' not found on Google Drive.`
 >
@@ -334,8 +347,8 @@ The table below shows which standard and unique parameters are supported by each
 | **[generate_verses_folder.py](data-pre-processing/generate_verses_folder.py)** | `--data_folder` | *None* |
 | **[generate_utterance_file.py](data-pre-processing/generate_utterance_file.py)** | `--data_folder` | *None* |
 | **[verify_data.py](data-verification/verify_data.py)** | All common arguments | `--json`: Output verification errors as a JSON block. |
-| **[synchronise_data.py](data-synchronisation/synchronise_data.py)** | All common arguments | `--headless`: SSH/console-mode authentication.<br>`--no-verify`: Skip verification gate before synchronization.<br>`--no-date-check`: Force upload even when the Drive copy already has the same or newer modification date.<br>`--download`: Download from Google Drive instead of uploading. |
-| **[data_statistics.py](utils/data_statistics.py)** | `--data_folder`, `--book`, `--chapter`, `--preprocessor` | `--books`: space-separated list of books to compile metrics (mutually exclusive with `--book` and `--preprocessor`). |
+| **[synchronise_data.py](data-synchronisation/synchronise_data.py)** | All common arguments | `--headless`: SSH/console-mode authentication.<br>`--no-verify`: Skip verification gate before synchroniz[...]
+| **[data_statistics.py](utils/data_statistics.py)** | `--data_folder`, `--book`, `--chapter`, `--preprocessor` | `--books`: space-separated list of books to compile metrics (mutually exclusive with `[...]
 | **[assigning_data_to_pre_pocessors.py](utils/assigning_data_to_pre_pocessors.py)**| `--data_folder` | `--nbr_pre_processors` (default `5`): Total partitions. |
 
 ## Folder Structure After Processing
@@ -362,9 +375,9 @@ scraping/data/
 - **Timeout Error**: Might be due to slow page loads or cookie consent popups.
 - **Selector Changes**: The scraper depends on Bible.com's CSS classes. If the site layout changes, update selectors in `src/scrapping.js` or `src/textDownloader.js`.
 - **wget not found**: Ensure `wget` is available in your PATH.
-- **OAuth 2.0 Access Denied (Error 403: access_denied)**: Make sure the Gmail address you are authenticating with is added to the "Test users" list in your Google Cloud Project's OAuth consent screen config.
+- **OAuth 2.0 Access Denied (Error 403: access_denied)**: Make sure the Gmail address you are authenticating with is added to the "Test users" list in your Google Cloud Project's OAuth consent screen [...]
 - **Google hasn't verified this app warning**: This is normal for unverified development apps. Click **Advanced** and then **Go to [Project Name] (unsafe)** to bypass.
-- **Storage Quota Exceeded (Error 403: storageQuotaExceeded)**: Service accounts have a very limited shared storage. Configure and use OAuth2 with `client-secret.json` to utilize your personal account's Google Drive storage instead.
-- **Drive Folder ID Not Found or Access Error**: Ensure that `DRIVE_FOLDER_ID` is set correctly in your `.env` file, and that the target Google Drive folder is shared with the account executing the script (e.g. Editor permission).
+- **Storage Quota Exceeded (Error 403: storageQuotaExceeded)**: Service accounts have a very limited shared storage. Configure and use OAuth2 with `client-secret.json` to utilize your personal account[...]
+- **Drive Folder ID Not Found or Access Error**: Ensure that `DRIVE_FOLDER_ID` is set correctly in your `.env` file, and that the target Google Drive folder is shared with the account executing the sc[...]
 - **Verification Failures During Upload**: If synchronization is blocked because of local text validation failures, you can bypass the checks using the `--no-verify` flag.
 - **Forced Re-upload**: If you need to resend a file despite the date-based optimization, use `--no-date-check`.
